@@ -250,19 +250,35 @@ export class BrowserManager {
   async typeText(selector: string, text: string): Promise<boolean> {
     if (!this.view) return false;
     try {
-      await this.view.webContents.executeJavaScript(`
-        (function() {
-          const el = document.querySelector('${selector.replace(/'/g, "\\'")}');
-          if (el) {
-            el.focus();
-            el.value = '${text.replace(/'/g, "\\'")}';
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            return true;
+      // Properly escape text by passing it as a parameter
+      const result = await this.view.webContents.executeJavaScript(`
+        (function(selector, text) {
+          const el = document.querySelector(selector);
+          if (!el) return false;
+
+          // Focus the element
+          el.focus();
+
+          // Set value
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype,
+            'value'
+          )?.set;
+
+          if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(el, text);
+          } else {
+            el.value = text;
           }
-          return false;
-        })()
+
+          // Dispatch events that React forms listen to
+          el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+
+          return true;
+        })(${JSON.stringify(selector)}, ${JSON.stringify(text)})
       `);
-      return true;
+      return result === true;
     } catch (error) {
       console.error('typeText failed:', error);
       return false;

@@ -295,8 +295,13 @@ async function main() {
 
         case 'browser_evaluate_js': {
           const result = await bridge.sendCommand('evaluateJS', { code: args?.code });
+          // Handle undefined/null results properly
+          const resultText = result === undefined ? 'undefined'
+            : result === null ? 'null'
+            : typeof result === 'string' ? result
+            : JSON.stringify(result, null, 2);
           return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }]
+            content: [{ type: 'text', text: resultText }]
           };
         }
 
