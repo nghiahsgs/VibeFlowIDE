@@ -13,6 +13,7 @@ export function TerminalPanel() {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const initializedRef = useRef(false);
 
   // Handle terminal resize
   const handleResize = useCallback(() => {
@@ -24,7 +25,9 @@ export function TerminalPanel() {
   }, []);
 
   useEffect(() => {
-    if (!containerRef.current || terminalRef.current) return;
+    // Prevent double initialization in React Strict Mode
+    if (!containerRef.current || initializedRef.current) return;
+    initializedRef.current = true;
 
     // Create terminal
     const terminal = new Terminal({
@@ -62,11 +65,6 @@ export function TerminalPanel() {
     terminal.loadAddon(fitAddon);
     terminal.open(containerRef.current);
 
-    // Initial fit
-    setTimeout(() => {
-      fitAddon.fit();
-    }, 0);
-
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
@@ -89,14 +87,31 @@ export function TerminalPanel() {
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(containerRef.current);
 
-    // Cleanup
+    // Initial fit after a short delay to ensure container is sized
+    setTimeout(() => {
+      fitAddon.fit();
+      const { cols, rows } = terminal;
+      window.terminal.resize(TERMINAL_ID, cols, rows);
+    }, 100);
+
+    // Cleanup only on actual unmount (not strict mode re-run)
     return () => {
-      unsubscribe();
-      resizeObserver.disconnect();
-      window.terminal.kill(TERMINAL_ID);
-      terminal.dispose();
+      // Don't cleanup in strict mode's first unmount
+      // The component will be remounted immediately
     };
   }, [handleResize]);
+
+  // Actual cleanup on window unload
+  useEffect(() => {
+    const cleanup = () => {
+      if (terminalRef.current) {
+        window.terminal.kill(TERMINAL_ID);
+        terminalRef.current.dispose();
+      }
+    };
+    window.addEventListener('beforeunload', cleanup);
+    return () => window.removeEventListener('beforeunload', cleanup);
+  }, []);
 
   return (
     <div className="terminal-panel">

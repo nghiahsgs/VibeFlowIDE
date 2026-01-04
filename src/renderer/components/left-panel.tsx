@@ -1,55 +1,41 @@
 /**
  * Left Panel Component
  * Contains Terminal and Network tabs with resizable split
+ * Terminal is always mounted to preserve PTY connection
  */
 import { useState } from 'react';
-import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { TerminalPanel } from './terminal-panel';
 import { NetworkPanel } from './network-panel';
 
-type TabType = 'terminal' | 'network' | 'split';
+type TabType = 'terminal' | 'network';
 
 export function LeftPanel() {
-  const [viewMode, setViewMode] = useState<TabType>('split');
+  const [activeTab, setActiveTab] = useState<TabType>('terminal');
 
   return (
     <div className="left-panel">
       <div className="left-panel-tabs">
         <button
-          className={`tab-btn ${viewMode === 'terminal' ? 'active' : ''}`}
-          onClick={() => setViewMode('terminal')}
+          className={`tab-btn ${activeTab === 'terminal' ? 'active' : ''}`}
+          onClick={() => setActiveTab('terminal')}
         >
           Terminal
         </button>
         <button
-          className={`tab-btn ${viewMode === 'network' ? 'active' : ''}`}
-          onClick={() => setViewMode('network')}
+          className={`tab-btn ${activeTab === 'network' ? 'active' : ''}`}
+          onClick={() => setActiveTab('network')}
         >
           Network
-        </button>
-        <button
-          className={`tab-btn ${viewMode === 'split' ? 'active' : ''}`}
-          onClick={() => setViewMode('split')}
-          title="Split view"
-        >
-          ⊞
         </button>
       </div>
 
       <div className="left-panel-content">
-        {viewMode === 'terminal' && <TerminalPanel />}
-        {viewMode === 'network' && <NetworkPanel />}
-        {viewMode === 'split' && (
-          <PanelGroup direction="vertical">
-            <Panel defaultSize={50} minSize={20}>
-              <TerminalPanel />
-            </Panel>
-            <PanelResizeHandle className="resize-handle-horizontal" />
-            <Panel defaultSize={50} minSize={20}>
-              <NetworkPanel />
-            </Panel>
-          </PanelGroup>
-        )}
+        {/* Terminal always mounted, hidden when not active */}
+        <div style={{ display: activeTab === 'terminal' ? 'flex' : 'none', height: '100%' }}>
+          <TerminalPanel />
+        </div>
+        {/* Network only mounted when active */}
+        {activeTab === 'network' && <NetworkPanel />}
       </div>
     </div>
   );
