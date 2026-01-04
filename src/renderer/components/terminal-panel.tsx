@@ -123,11 +123,12 @@ export function TerminalPanel() {
           window.terminal.write(instance.id, data);
         });
 
-        // Fit terminal
+        // Fit terminal and focus
         setTimeout(() => {
           instance.fitAddon.fit();
           const { cols, rows } = instance.terminal;
           window.terminal.resize(instance.id, cols, rows);
+          instance.terminal.focus();
         }, 100);
       }
     });
@@ -153,11 +154,12 @@ export function TerminalPanel() {
 
     resizeObserver.observe(container);
 
-    // Fit on active change
+    // Fit and focus on active change
     setTimeout(() => {
       instance.fitAddon.fit();
       const { cols, rows } = instance.terminal;
       window.terminal.resize(instance.id, cols, rows);
+      instance.terminal.focus();
     }, 50);
 
     return () => resizeObserver.disconnect();
@@ -185,6 +187,7 @@ export function TerminalPanel() {
             }}
             className="terminal-container"
             style={{ display: instance.id === activeTerminalId ? 'block' : 'none' }}
+            onClick={() => instance.terminal.focus()}
           />
         ))}
       </div>

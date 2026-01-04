@@ -39,6 +39,7 @@ interface NetworkRequest {
   requestHeaders: Record<string, string>;
   responseHeaders: Record<string, string>;
   requestBody?: string;
+  responseBody?: string;
   responseSize: number;
   error?: string;
 }

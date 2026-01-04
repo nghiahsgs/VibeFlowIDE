@@ -18,6 +18,7 @@ export interface NetworkRequest {
   requestHeaders: Record<string, string>;
   responseHeaders: Record<string, string>;
   requestBody?: string;
+  responseBody?: string;
   responseSize: number;
   error?: string;
 }
@@ -131,7 +132,7 @@ export class NetworkInterceptor {
     }
   }
 
-  private onLoadingFinished(params: Record<string, unknown>): void {
+  private async onLoadingFinished(params: Record<string, unknown>): Promise<void> {
     const requestId = params.requestId as string;
     const request = this.requests.get(requestId);
 
@@ -139,6 +140,27 @@ export class NetworkInterceptor {
       request.endTime = Date.now();
       request.duration = request.endTime - request.startTime;
       request.responseSize = (params.encodedDataLength as number) || 0;
+
+      // Fetch response body for text-based responses
+      if (this.webContents && this.debuggerAttached) {
+        try {
+          const result = await this.webContents.debugger.sendCommand('Network.getResponseBody', {
+            requestId
+          }) as { body: string; base64Encoded: boolean };
+
+          if (result.base64Encoded) {
+            // For binary content, just indicate it's binary
+            request.responseBody = `[Binary data: ${request.mimeType}]`;
+          } else {
+            // Limit response body to 100KB to avoid memory issues
+            request.responseBody = result.body.substring(0, 100 * 1024);
+          }
+        } catch {
+          // Some responses don't have body (304, redirects, etc.)
+          request.responseBody = undefined;
+        }
+      }
+
       this.notifyUpdate();
     }
   }

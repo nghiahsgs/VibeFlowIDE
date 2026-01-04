@@ -410,6 +410,21 @@
   color: #f14c4c;
 }
 
+.response-body {
+  margin: 4px 0 0 0;
+  padding: 8px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #d4d4d4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 /* Horizontal resize handle */
 .resize-handle-horizontal {
   height: 4px;

@@ -229,6 +229,20 @@ export function NetworkPanel() {
                   </div>
                 ))}
               </div>
+
+              {selectedRequest.requestBody && (
+                <div className="detail-section">
+                  <h4>Request Body</h4>
+                  <pre className="response-body">{selectedRequest.requestBody}</pre>
+                </div>
+              )}
+
+              {selectedRequest.responseBody && (
+                <div className="detail-section">
+                  <h4>Response Body</h4>
+                  <pre className="response-body">{selectedRequest.responseBody}</pre>
+                </div>
+              )}
             </div>
           </div>
         )}
