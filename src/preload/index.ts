@@ -36,7 +36,8 @@ const browserAPI = {
     return () => ipcRenderer.removeListener('browser:navigated', handler);
   },
   getConsoleLogs: () => ipcRenderer.invoke('browser:console-logs') as Promise<string[]>,
-  clearConsoleLogs: () => ipcRenderer.send('browser:clear-console')
+  clearConsoleLogs: () => ipcRenderer.send('browser:clear-console'),
+  screenshot: () => ipcRenderer.invoke('browser:screenshot') as Promise<string>
 };
 
 // Network API

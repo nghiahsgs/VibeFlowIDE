@@ -81,6 +81,23 @@ export function BrowserPanel() {
         </form>
 
         <button
+          onClick={async () => {
+            const base64 = await window.browser.screenshot();
+            if (base64) {
+              // Convert base64 to blob and copy to clipboard
+              const response = await fetch(`data:image/png;base64,${base64}`);
+              const blob = await response.blob();
+              await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]);
+            }
+          }}
+          title="Screenshot to Clipboard"
+          className="toolbar-btn"
+        >
+          📷
+        </button>
+        <button
           onClick={() => window.browser.openDevTools()}
           title="Open DevTools"
           className="toolbar-btn"

@@ -23,6 +23,7 @@ interface BrowserAPI {
   onNavigate: (callback: (url: string) => void) => () => void;
   getConsoleLogs: () => Promise<string[]>;
   clearConsoleLogs: () => void;
+  screenshot: () => Promise<string>;
 }
 
 interface NetworkRequest {

@@ -126,6 +126,10 @@ function setupBrowserIPC(): void {
   ipcMain.on('browser:clear-console', () => {
     browserManager?.clearConsoleLogs();
   });
+
+  ipcMain.handle('browser:screenshot', async () => {
+    return browserManager?.screenshot() || '';
+  });
 }
 
 // Network IPC handlers
