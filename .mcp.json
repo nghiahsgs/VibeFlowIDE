@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "vibeflow-browser": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp-server/index.ts"],
+      "cwd": "~/Documents/GitHub/VibeFlowIDE"
+    }
+  }
+}
