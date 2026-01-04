@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Electron
+release/
+*.dmg
+*.AppImage
+*.exe
+*.deb
+*.rpm
