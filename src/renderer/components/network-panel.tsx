@@ -2,7 +2,7 @@
  * Network Panel Component
  * Displays network requests captured via CDP
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 // Status code color mapping
 function getStatusColor(status: number): string {
@@ -61,6 +61,37 @@ export function NetworkPanel() {
   const [selectedRequest, setSelectedRequest] = useState<NetworkRequest | null>(null);
   const [filter, setFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [detailsHeight, setDetailsHeight] = useState(300);
+  const isResizing = useRef(false);
+  const startY = useRef(0);
+  const startHeight = useRef(0);
+
+  // Handle resize drag
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    isResizing.current = true;
+    startY.current = e.clientY;
+    startHeight.current = detailsHeight;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      const delta = startY.current - e.clientY;
+      const newHeight = Math.max(150, Math.min(600, startHeight.current + delta));
+      setDetailsHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [detailsHeight]);
 
   useEffect(() => {
     // Subscribe to network updates
@@ -175,7 +206,11 @@ export function NetworkPanel() {
         </div>
 
         {selectedRequest && (
-          <div className="request-details">
+          <div className="request-details" style={{ height: detailsHeight }}>
+            <div
+              className="details-resize-handle"
+              onMouseDown={handleResizeStart}
+            />
             <div className="details-header">
               <span className="details-title">Request Details</span>
               <button

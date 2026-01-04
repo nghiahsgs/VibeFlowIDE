@@ -57,10 +57,7 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
-  // Open DevTools in development
-  if (is.dev) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
+  // DevTools disabled by default - use View menu or Cmd+Option+I to open
 
   mainWindow.on('closed', () => {
     ptyManager?.killAll();

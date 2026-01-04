@@ -338,11 +338,28 @@
 
 /* Request Details */
 .request-details {
-  height: 200px;
   border-top: 1px solid #3c3c3c;
   background: #252526;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.details-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: row-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.details-resize-handle:hover,
+.details-resize-handle:active {
+  background: #007acc;
 }
 
 .details-header {
@@ -421,7 +438,8 @@
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-all;
-  max-height: 300px;
+  flex: 1;
+  min-height: 100px;
   overflow-y: auto;
 }
 
