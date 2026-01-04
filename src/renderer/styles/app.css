@@ -502,6 +502,16 @@
   cursor: not-allowed;
 }
 
+.toolbar-btn.screenshot-success {
+  background: #23d18b;
+  color: #1e1e1e;
+}
+
+.toolbar-btn.screenshot-error {
+  background: #f14c4c;
+  color: #ffffff;
+}
+
 /* URL Form */
 .url-form {
   flex: 1;

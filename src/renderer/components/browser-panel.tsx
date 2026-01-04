@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 export function BrowserPanel() {
   const [url, setUrl] = useState('https://www.google.com');
   const [inputUrl, setInputUrl] = useState('https://www.google.com');
+  const [screenshotStatus, setScreenshotStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Update browser bounds when container resizes
@@ -82,20 +83,29 @@ export function BrowserPanel() {
 
         <button
           onClick={async () => {
-            const base64 = await window.browser.screenshot();
-            if (base64) {
-              // Convert base64 to blob and copy to clipboard
-              const response = await fetch(`data:image/png;base64,${base64}`);
-              const blob = await response.blob();
-              await navigator.clipboard.write([
-                new ClipboardItem({ 'image/png': blob })
-              ]);
+            try {
+              setScreenshotStatus('idle');
+              const base64 = await window.browser.screenshot();
+              if (base64) {
+                // Convert base64 to blob and copy to clipboard
+                const response = await fetch(`data:image/png;base64,${base64}`);
+                const blob = await response.blob();
+                await navigator.clipboard.write([
+                  new ClipboardItem({ 'image/png': blob })
+                ]);
+                setScreenshotStatus('success');
+                setTimeout(() => setScreenshotStatus('idle'), 1500);
+              }
+            } catch (err) {
+              console.error('Screenshot failed:', err);
+              setScreenshotStatus('error');
+              setTimeout(() => setScreenshotStatus('idle'), 1500);
             }
           }}
           title="Screenshot to Clipboard"
-          className="toolbar-btn"
+          className={`toolbar-btn ${screenshotStatus === 'success' ? 'screenshot-success' : ''} ${screenshotStatus === 'error' ? 'screenshot-error' : ''}`}
         >
-          📷
+          {screenshotStatus === 'success' ? '✓' : screenshotStatus === 'error' ? '✗' : '📷'}
         </button>
         <button
           onClick={() => window.browser.openDevTools()}
