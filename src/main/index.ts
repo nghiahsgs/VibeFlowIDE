@@ -72,10 +72,14 @@ function createWindow(): void {
 
 // Terminal IPC handlers
 function setupTerminalIPC(): void {
-  ipcMain.on('terminal:create', (event, id: string) => {
+  ipcMain.on('terminal:create', (event, payload: string | { id: string; cwd?: string }) => {
+    // Support both old (string) and new ({id, cwd}) formats
+    const id = typeof payload === 'string' ? payload : payload.id;
+    const cwd = typeof payload === 'string' ? undefined : payload.cwd;
+
     ptyManager?.create(id, (data) => {
       mainWindow?.webContents.send('terminal:data', { id, data });
-    });
+    }, cwd);
   });
 
   ipcMain.on('terminal:write', (_, { id, data }: { id: string; data: string }) => {
@@ -88,6 +92,10 @@ function setupTerminalIPC(): void {
 
   ipcMain.on('terminal:kill', (_, id: string) => {
     ptyManager?.kill(id);
+  });
+
+  ipcMain.handle('terminal:getCwd', async (_, id: string) => {
+    return ptyManager?.getCwd(id) || '';
   });
 }
 

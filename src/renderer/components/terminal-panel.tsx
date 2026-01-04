@@ -12,6 +12,7 @@ interface TerminalInstance {
   name: string;
   terminal: Terminal;
   fitAddon: FitAddon;
+  cwd?: string;
 }
 
 let terminalCounter = 0;
@@ -23,7 +24,7 @@ export function TerminalPanel() {
   const initializedRef = useRef(false);
 
   // Create a new terminal instance
-  const createTerminal = useCallback(() => {
+  const createTerminal = useCallback(async (cwd?: string) => {
     const id = `terminal-${++terminalCounter}`;
     const name = `zsh ${terminalCounter}`;
 
@@ -61,7 +62,7 @@ export function TerminalPanel() {
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
 
-    const instance: TerminalInstance = { id, name, terminal, fitAddon };
+    const instance: TerminalInstance = { id, name, terminal, fitAddon, cwd };
 
     setTerminals(prev => [...prev, instance]);
     setActiveTerminalId(id);
@@ -106,8 +107,8 @@ export function TerminalPanel() {
       if (container && !container.hasChildNodes()) {
         instance.terminal.open(container);
 
-        // Create PTY
-        window.terminal.create(instance.id);
+        // Create PTY with cwd
+        window.terminal.create(instance.id, instance.cwd);
 
         // Handle data from PTY
         const dataHandler = ({ id, data }: { id: string; data: string }) => {
@@ -213,7 +214,18 @@ export function TerminalPanel() {
             </div>
           ))}
         </div>
-        <button className="terminal-add-btn" onClick={createTerminal} title="New Terminal">
+        <button
+          className="terminal-add-btn"
+          onClick={async () => {
+            // Get cwd from active terminal
+            let cwd: string | undefined;
+            if (activeTerminalId) {
+              cwd = await window.terminal.getCwd(activeTerminalId);
+            }
+            createTerminal(cwd);
+          }}
+          title="New Terminal"
+        >
           +
         </button>
       </div>

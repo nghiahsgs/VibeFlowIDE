@@ -9,6 +9,7 @@ import fs from 'fs';
 interface PtyInstance {
   process: pty.IPty;
   onDataCallback: (data: string) => void;
+  initialCwd: string;
 }
 
 export class PtyManager {
@@ -46,24 +47,25 @@ export class PtyManager {
   /**
    * Create a new terminal instance
    */
-  create(id: string, onData: (data: string) => void): void {
+  create(id: string, onData: (data: string) => void, cwd?: string): void {
     // Kill existing instance if any
     this.kill(id);
 
     const shell = this.findShell();
     const shellArgs = os.platform() === 'win32' ? [] : ['-l'];
     const homeDir = os.homedir();
+    const workingDir = cwd || homeDir;
 
     console.log(`[PTY] Creating terminal ${id}`);
     console.log(`[PTY] Shell: ${shell}`);
-    console.log(`[PTY] Home: ${homeDir}`);
+    console.log(`[PTY] CWD: ${workingDir}`);
 
     try {
       const ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols: 80,
         rows: 30,
-        cwd: homeDir,
+        cwd: workingDir,
         env: {
           PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
           HOME: homeDir,
@@ -84,7 +86,8 @@ export class PtyManager {
 
       this.instances.set(id, {
         process: ptyProcess,
-        onDataCallback: onData
+        onDataCallback: onData,
+        initialCwd: workingDir
       });
 
       console.log(`[PTY] Terminal ${id} created successfully`);
@@ -142,5 +145,38 @@ export class PtyManager {
    */
   getActiveCount(): number {
     return this.instances.size;
+  }
+
+  /**
+   * Get current working directory of a terminal
+   * Uses lsof on macOS/Linux to get the actual cwd
+   */
+  async getCwd(id: string): Promise<string> {
+    const instance = this.instances.get(id);
+    if (!instance) return os.homedir();
+
+    const pid = instance.process.pid;
+
+    try {
+      if (os.platform() === 'darwin') {
+        // macOS: use lsof to get cwd
+        const { execSync } = await import('child_process');
+        const output = execSync(`lsof -p ${pid} -Fn 2>/dev/null | grep '^n/' | grep cwd | cut -c2-`, {
+          encoding: 'utf8',
+          timeout: 1000
+        }).trim();
+        if (output) return output;
+      } else if (os.platform() === 'linux') {
+        // Linux: read from /proc
+        const cwdLink = `/proc/${pid}/cwd`;
+        if (fs.existsSync(cwdLink)) {
+          return fs.readlinkSync(cwdLink);
+        }
+      }
+    } catch {
+      // Fallback to initial cwd
+    }
+
+    return instance.initialCwd;
   }
 }

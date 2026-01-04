@@ -4,10 +4,11 @@
  */
 
 interface TerminalAPI {
-  create: (id: string) => void;
+  create: (id: string, cwd?: string) => void;
   write: (id: string, data: string) => void;
   resize: (id: string, cols: number, rows: number) => void;
   kill: (id: string) => void;
+  getCwd: (id: string) => Promise<string>;
   onData: (callback: (payload: { id: string; data: string }) => void) => () => void;
 }
 

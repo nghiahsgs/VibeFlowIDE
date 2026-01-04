@@ -6,11 +6,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 // Terminal API
 const terminalAPI = {
-  create: (id: string) => ipcRenderer.send('terminal:create', id),
+  create: (id: string, cwd?: string) => ipcRenderer.send('terminal:create', { id, cwd }),
   write: (id: string, data: string) => ipcRenderer.send('terminal:write', { id, data }),
   resize: (id: string, cols: number, rows: number) =>
     ipcRenderer.send('terminal:resize', { id, cols, rows }),
   kill: (id: string) => ipcRenderer.send('terminal:kill', id),
+  getCwd: (id: string) => ipcRenderer.invoke('terminal:getCwd', id) as Promise<string>,
   onData: (callback: (payload: { id: string; data: string }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, payload: { id: string; data: string }) =>
       callback(payload);
