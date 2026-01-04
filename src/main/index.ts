@@ -121,6 +121,14 @@ function setupBrowserIPC(): void {
   ipcMain.on('browser:set-bounds', (_, bounds: { x: number; y: number; width: number; height: number }) => {
     browserManager?.setBounds(bounds);
   });
+
+  ipcMain.handle('browser:console-logs', () => {
+    return browserManager?.getConsoleLogs() || [];
+  });
+
+  ipcMain.on('browser:clear-console', () => {
+    browserManager?.clearConsoleLogs();
+  });
 }
 
 // Network IPC handlers

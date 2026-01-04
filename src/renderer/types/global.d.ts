@@ -21,6 +21,8 @@ interface BrowserAPI {
   getURL: () => Promise<string>;
   setBounds: (bounds: { x: number; y: number; width: number; height: number }) => void;
   onNavigate: (callback: (url: string) => void) => () => void;
+  getConsoleLogs: () => Promise<string[]>;
+  clearConsoleLogs: () => void;
 }
 
 interface NetworkRequest {

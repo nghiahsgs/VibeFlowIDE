@@ -816,3 +816,133 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* Network Type Filters */
+.network-type-filters {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  overflow-x: auto;
+}
+
+.type-filter-btn {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid #3c3c3c;
+  border-radius: 12px;
+  color: #888888;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.type-filter-btn:hover {
+  background: #3c3c3c;
+  color: #cccccc;
+}
+
+.type-filter-btn.active {
+  background: #007acc;
+  border-color: #007acc;
+  color: #ffffff;
+}
+
+/* Console Panel */
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1e1e1e;
+  font-size: 11px;
+}
+
+.console-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.console-level-filters {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  overflow-x: auto;
+}
+
+.level-filter-btn {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid #3c3c3c;
+  border-radius: 12px;
+  color: #888888;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.level-filter-btn:hover {
+  background: #3c3c3c;
+}
+
+.level-filter-btn.active {
+  background: #3c3c3c;
+  border-color: #888888;
+}
+
+.log-count {
+  color: #888888;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.console-logs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.no-logs {
+  padding: 20px;
+  text-align: center;
+  color: #666666;
+}
+
+.console-log-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 8px;
+  border-left: 2px solid;
+  margin-bottom: 2px;
+  background: #252526;
+  border-radius: 0 4px 4px 0;
+}
+
+.console-log-row.level-error {
+  background: rgba(241, 76, 76, 0.1);
+}
+
+.console-log-row.level-warning {
+  background: rgba(229, 229, 16, 0.1);
+}
+
+.log-icon {
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.log-message {
+  color: #cccccc;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  word-break: break-all;
+  white-space: pre-wrap;
+}

@@ -1,15 +1,16 @@
 /**
  * Left Panel Component
- * Contains Terminal, Network, Ports, and MCP tabs
+ * Contains Terminal, Network, Console, Ports, and MCP tabs
  * Terminal is always mounted to preserve PTY connection
  */
 import { useState } from 'react';
 import { TerminalPanel } from './terminal-panel';
 import { NetworkPanel } from './network-panel';
+import { ConsolePanel } from './console-panel';
 import { MCPPanel } from './mcp-panel';
 import { PortsPanel } from './ports-panel';
 
-type TabType = 'terminal' | 'network' | 'ports' | 'mcp';
+type TabType = 'terminal' | 'network' | 'console' | 'ports' | 'mcp';
 
 export function LeftPanel() {
   const [activeTab, setActiveTab] = useState<TabType>('terminal');
@@ -28,6 +29,12 @@ export function LeftPanel() {
           onClick={() => setActiveTab('network')}
         >
           Network
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'console' ? 'active' : ''}`}
+          onClick={() => setActiveTab('console')}
+        >
+          Console
         </button>
         <button
           className={`tab-btn ${activeTab === 'ports' ? 'active' : ''}`}
@@ -50,6 +57,8 @@ export function LeftPanel() {
         </div>
         {/* Network only mounted when active */}
         {activeTab === 'network' && <NetworkPanel />}
+        {/* Console panel */}
+        {activeTab === 'console' && <ConsolePanel />}
         {/* Ports panel */}
         {activeTab === 'ports' && <PortsPanel />}
         {/* MCP panel */}

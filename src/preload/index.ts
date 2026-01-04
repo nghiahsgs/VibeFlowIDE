@@ -34,7 +34,9 @@ const browserAPI = {
     const handler = (_: Electron.IpcRendererEvent, url: string) => callback(url);
     ipcRenderer.on('browser:navigated', handler);
     return () => ipcRenderer.removeListener('browser:navigated', handler);
-  }
+  },
+  getConsoleLogs: () => ipcRenderer.invoke('browser:console-logs') as Promise<string[]>,
+  clearConsoleLogs: () => ipcRenderer.send('browser:clear-console')
 };
 
 // Network API

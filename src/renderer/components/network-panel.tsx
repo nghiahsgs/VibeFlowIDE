@@ -53,10 +53,14 @@ function getUrlFilename(url: string): string {
   }
 }
 
+// Available request types for filtering
+const REQUEST_TYPES = ['All', 'XHR', 'Fetch', 'Script', 'Stylesheet', 'Document', 'Font', 'Image', 'Other'];
+
 export function NetworkPanel() {
   const [requests, setRequests] = useState<NetworkRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<NetworkRequest | null>(null);
   const [filter, setFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('All');
 
   useEffect(() => {
     // Subscribe to network updates
@@ -78,8 +82,17 @@ export function NetworkPanel() {
     setSelectedRequest(null);
   }, []);
 
-  // Filter requests
+  // Filter requests by text and type
   const filteredRequests = requests.filter((req) => {
+    // Type filter
+    if (typeFilter !== 'All') {
+      const reqType = req.type.toLowerCase();
+      const filterType = typeFilter.toLowerCase();
+      if (!reqType.includes(filterType) && reqType !== filterType) {
+        return false;
+      }
+    }
+    // Text filter
     if (!filter) return true;
     const lowerFilter = filter.toLowerCase();
     return (
@@ -103,6 +116,17 @@ export function NetworkPanel() {
           className="filter-input"
         />
         <span className="request-count">{filteredRequests.length} requests</span>
+      </div>
+      <div className="network-type-filters">
+        {REQUEST_TYPES.map((type) => (
+          <button
+            key={type}
+            className={`type-filter-btn ${typeFilter === type ? 'active' : ''}`}
+            onClick={() => setTypeFilter(type)}
+          >
+            {type}
+          </button>
+        ))}
       </div>
 
       <div className="network-content">
