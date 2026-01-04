@@ -2,7 +2,7 @@
  * Browser Manager - Manages embedded browser via WebContentsView
  * Provides navigation controls and exposes webContents for MCP
  */
-import { BrowserWindow, WebContentsView } from 'electron';
+import { BrowserWindow, WebContentsView, clipboard } from 'electron';
 import { NetworkInterceptor, NetworkRequest } from './network-interceptor';
 
 interface BrowserBounds {
@@ -195,11 +195,13 @@ export class BrowserManager {
   }
 
   /**
-   * Take screenshot (returns base64)
+   * Take screenshot, copy to clipboard, and return base64
    */
   async screenshot(): Promise<string> {
     if (!this.view) return '';
     const image = await this.view.webContents.capturePage();
+    // Copy to clipboard using Electron's clipboard API
+    clipboard.writeImage(image);
     return image.toDataURL().split(',')[1]; // Return base64 without prefix
   }
 
