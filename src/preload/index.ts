@@ -48,10 +48,18 @@ const networkAPI = {
   getRequests: () => ipcRenderer.invoke('network:get-requests') as Promise<unknown[]>
 };
 
+// Ports API
+const portsAPI = {
+  scan: () => ipcRenderer.invoke('ports:scan') as Promise<unknown[]>,
+  kill: (pid: number) => ipcRenderer.invoke('ports:kill', pid) as Promise<boolean>,
+  killPort: (port: number) => ipcRenderer.invoke('ports:kill-port', port) as Promise<boolean>
+};
+
 // Expose APIs to renderer
 contextBridge.exposeInMainWorld('terminal', terminalAPI);
 contextBridge.exposeInMainWorld('browser', browserAPI);
 contextBridge.exposeInMainWorld('network', networkAPI);
+contextBridge.exposeInMainWorld('ports', portsAPI);
 
 // Type declarations for renderer
 export type TerminalAPI = typeof terminalAPI;

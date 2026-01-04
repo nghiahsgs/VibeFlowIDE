@@ -8,11 +8,13 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils';
 import { PtyManager } from './pty-manager';
 import { BrowserManager } from './browser-manager';
 import { MCPBridge } from './mcp-bridge';
+import { PortManager } from './port-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let ptyManager: PtyManager | null = null;
 let browserManager: BrowserManager | null = null;
 let mcpBridge: MCPBridge | null = null;
+let portManager: PortManager | null = null;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -40,11 +42,13 @@ function createWindow(): void {
   ptyManager = new PtyManager();
   browserManager = new BrowserManager(mainWindow);
   mcpBridge = new MCPBridge(browserManager);
+  portManager = new PortManager();
 
   // Setup IPC handlers
   setupTerminalIPC();
   setupBrowserIPC();
   setupNetworkIPC();
+  setupPortsIPC();
 
   // Load renderer
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -127,6 +131,21 @@ function setupNetworkIPC(): void {
 
   ipcMain.handle('network:get-requests', () => {
     return browserManager?.getNetworkRequests() || [];
+  });
+}
+
+// Ports IPC handlers
+function setupPortsIPC(): void {
+  ipcMain.handle('ports:scan', async () => {
+    return portManager?.scanPorts() || [];
+  });
+
+  ipcMain.handle('ports:kill', async (_, pid: number) => {
+    return portManager?.killProcess(pid) || false;
+  });
+
+  ipcMain.handle('ports:kill-port', async (_, port: number) => {
+    return portManager?.killPort(port) || false;
   });
 }
 

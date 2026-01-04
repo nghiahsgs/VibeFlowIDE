@@ -47,11 +47,26 @@ interface NetworkAPI {
   getRequests: () => Promise<NetworkRequest[]>;
 }
 
+interface PortProcess {
+  pid: number;
+  name: string;
+  port: number;
+  type: string;
+  cwd?: string;
+}
+
+interface PortsAPI {
+  scan: () => Promise<PortProcess[]>;
+  kill: (pid: number) => Promise<boolean>;
+  killPort: (port: number) => Promise<boolean>;
+}
+
 declare global {
   interface Window {
     terminal: TerminalAPI;
     browser: BrowserAPI;
     network: NetworkAPI;
+    ports: PortsAPI;
   }
 }
 
