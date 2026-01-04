@@ -161,7 +161,7 @@ export class PtyManager {
       if (os.platform() === 'darwin') {
         // macOS: use lsof to get cwd
         const { execSync } = await import('child_process');
-        const output = execSync(`lsof -p ${pid} -Fn 2>/dev/null | grep '^n/' | grep cwd | cut -c2-`, {
+        const output = execSync(`lsof -p ${pid} 2>/dev/null | grep ' cwd ' | awk '{print $NF}'`, {
           encoding: 'utf8',
           timeout: 1000
         }).trim();
