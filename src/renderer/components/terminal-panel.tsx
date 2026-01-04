@@ -1,35 +1,32 @@
 /**
  * Terminal Panel Component
- * Renders xterm.js terminal with pty backend
+ * Supports multiple terminal instances like VS Code
  */
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 
-const TERMINAL_ID = 'main-terminal';
+interface TerminalInstance {
+  id: string;
+  name: string;
+  terminal: Terminal;
+  fitAddon: FitAddon;
+}
+
+let terminalCounter = 0;
 
 export function TerminalPanel() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+  const [terminals, setTerminals] = useState<TerminalInstance[]>([]);
+  const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
+  const containerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const initializedRef = useRef(false);
 
-  // Handle terminal resize
-  const handleResize = useCallback(() => {
-    if (fitAddonRef.current && terminalRef.current) {
-      fitAddonRef.current.fit();
-      const { cols, rows } = terminalRef.current;
-      window.terminal.resize(TERMINAL_ID, cols, rows);
-    }
-  }, []);
+  // Create a new terminal instance
+  const createTerminal = useCallback(() => {
+    const id = `terminal-${++terminalCounter}`;
+    const name = `zsh ${terminalCounter}`;
 
-  useEffect(() => {
-    // Prevent double initialization in React Strict Mode
-    if (!containerRef.current || initializedRef.current) return;
-    initializedRef.current = true;
-
-    // Create terminal
     const terminal = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
@@ -63,75 +60,163 @@ export function TerminalPanel() {
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
-    terminal.open(containerRef.current);
 
-    terminalRef.current = terminal;
-    fitAddonRef.current = fitAddon;
+    const instance: TerminalInstance = { id, name, terminal, fitAddon };
 
-    // Create PTY process
-    window.terminal.create(TERMINAL_ID);
+    setTerminals(prev => [...prev, instance]);
+    setActiveTerminalId(id);
 
-    // Handle data from PTY
-    const unsubscribe = window.terminal.onData(({ id, data }) => {
-      if (id === TERMINAL_ID) {
-        terminal.write(data);
+    return instance;
+  }, []);
+
+  // Close a terminal
+  const closeTerminal = useCallback((id: string) => {
+    setTerminals(prev => {
+      const filtered = prev.filter(t => t.id !== id);
+      const toClose = prev.find(t => t.id === id);
+
+      if (toClose) {
+        window.terminal.kill(id);
+        toClose.terminal.dispose();
+        containerRefs.current.delete(id);
+      }
+
+      // Switch to another terminal if closing active one
+      if (id === activeTerminalId && filtered.length > 0) {
+        setActiveTerminalId(filtered[filtered.length - 1].id);
+      } else if (filtered.length === 0) {
+        setActiveTerminalId(null);
+      }
+
+      return filtered;
+    });
+  }, [activeTerminalId]);
+
+  // Initialize first terminal
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    createTerminal();
+  }, [createTerminal]);
+
+  // Setup terminal when container is available
+  useEffect(() => {
+    terminals.forEach(instance => {
+      const container = containerRefs.current.get(instance.id);
+      if (container && !container.hasChildNodes()) {
+        instance.terminal.open(container);
+
+        // Create PTY
+        window.terminal.create(instance.id);
+
+        // Handle data from PTY
+        const dataHandler = ({ id, data }: { id: string; data: string }) => {
+          if (id === instance.id) {
+            instance.terminal.write(data);
+          }
+        };
+        window.terminal.onData(dataHandler);
+
+        // Send user input to PTY
+        instance.terminal.onData((data) => {
+          window.terminal.write(instance.id, data);
+        });
+
+        // Fit terminal
+        setTimeout(() => {
+          instance.fitAddon.fit();
+          const { cols, rows } = instance.terminal;
+          window.terminal.resize(instance.id, cols, rows);
+        }, 100);
       }
     });
+  }, [terminals]);
 
-    // Send user input to PTY
-    terminal.onData((data) => {
-      window.terminal.write(TERMINAL_ID, data);
-    });
+  // Handle resize for active terminal
+  useEffect(() => {
+    if (!activeTerminalId) return;
 
-    // Handle window resize
+    const instance = terminals.find(t => t.id === activeTerminalId);
+    if (!instance) return;
+
+    const container = containerRefs.current.get(activeTerminalId);
+    if (!container) return;
+
     const resizeObserver = new ResizeObserver(() => {
-      // Debounce resize to avoid too many calls
       requestAnimationFrame(() => {
-        if (fitAddonRef.current && terminalRef.current) {
-          fitAddonRef.current.fit();
-          const { cols, rows } = terminalRef.current;
-          window.terminal.resize(TERMINAL_ID, cols, rows);
-        }
+        instance.fitAddon.fit();
+        const { cols, rows } = instance.terminal;
+        window.terminal.resize(instance.id, cols, rows);
       });
     });
-    resizeObserver.observe(containerRef.current);
 
-    // Multiple fit attempts to ensure proper sizing
-    const fitTerminal = () => {
-      if (fitAddonRef.current && terminalRef.current) {
-        fitAddonRef.current.fit();
-        const { cols, rows } = terminalRef.current;
-        window.terminal.resize(TERMINAL_ID, cols, rows);
-      }
-    };
+    resizeObserver.observe(container);
 
-    // Fit at different intervals to handle layout settling
-    setTimeout(fitTerminal, 50);
-    setTimeout(fitTerminal, 200);
-    setTimeout(fitTerminal, 500);
+    // Fit on active change
+    setTimeout(() => {
+      instance.fitAddon.fit();
+      const { cols, rows } = instance.terminal;
+      window.terminal.resize(instance.id, cols, rows);
+    }, 50);
 
-    // Cleanup only on actual unmount (not strict mode re-run)
-    return () => {
-      // Don't cleanup in strict mode's first unmount
-      // The component will be remounted immediately
-    };
-  }, [handleResize]);
+    return () => resizeObserver.disconnect();
+  }, [activeTerminalId, terminals]);
 
-  // Actual cleanup on window unload
+  // Cleanup on unmount
   useEffect(() => {
-    const cleanup = () => {
-      if (terminalRef.current) {
-        window.terminal.kill(TERMINAL_ID);
-        terminalRef.current.dispose();
-      }
+    return () => {
+      terminals.forEach(t => {
+        window.terminal.kill(t.id);
+        t.terminal.dispose();
+      });
     };
-    window.addEventListener('beforeunload', cleanup);
-    return () => window.removeEventListener('beforeunload', cleanup);
   }, []);
 
   return (
     <div className="terminal-panel">
-      <div ref={containerRef} className="terminal-container" />
+      {/* Terminal containers - show/hide based on active */}
+      <div className="terminal-instances">
+        {terminals.map(instance => (
+          <div
+            key={instance.id}
+            ref={el => {
+              if (el) containerRefs.current.set(instance.id, el);
+            }}
+            className="terminal-container"
+            style={{ display: instance.id === activeTerminalId ? 'block' : 'none' }}
+          />
+        ))}
+      </div>
+
+      {/* Terminal tabs bar */}
+      <div className="terminal-tabs">
+        <div className="terminal-tabs-list">
+          {terminals.map(instance => (
+            <div
+              key={instance.id}
+              className={`terminal-tab ${instance.id === activeTerminalId ? 'active' : ''}`}
+              onClick={() => setActiveTerminalId(instance.id)}
+            >
+              <span className="terminal-tab-icon">⌘</span>
+              <span className="terminal-tab-name">{instance.name}</span>
+              {terminals.length > 1 && (
+                <button
+                  className="terminal-tab-close"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeTerminal(instance.id);
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button className="terminal-add-btn" onClick={createTerminal} title="New Terminal">
+          +
+        </button>
+      </div>
     </div>
   );
 }
