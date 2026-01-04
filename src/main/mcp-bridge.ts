@@ -124,8 +124,8 @@ export class MCPBridge {
           if (!url) {
             return { id, success: false, error: 'Missing URL' };
           }
-          this.browser.navigate(url);
-          return { id, success: true, data: `Navigating to ${url}` };
+          const success = await this.browser.navigate(url);
+          return { id, success, data: success ? `Navigated to ${url}` : `Failed to navigate to ${url}` };
         }
 
         case 'getDOM': {

@@ -100,14 +100,52 @@ export class BrowserManager {
   }
 
   /**
-   * Navigate to URL
+   * Navigate to URL and wait for page to load
    */
-  navigate(url: string): void {
+  async navigate(url: string): Promise<boolean> {
+    if (!this.view) return false;
+
     // Add protocol if missing
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
-    this.view?.webContents.loadURL(url);
+
+    return new Promise((resolve) => {
+      const webContents = this.view!.webContents;
+
+      const onDidFinish = () => {
+        cleanup();
+        resolve(true);
+      };
+
+      const onDidFail = () => {
+        cleanup();
+        resolve(false);
+      };
+
+      const cleanup = () => {
+        webContents.removeListener('did-finish-load', onDidFinish);
+        webContents.removeListener('did-fail-load', onDidFail);
+      };
+
+      // Set timeout in case load takes too long
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve(true); // Resolve anyway after timeout
+      }, 15000);
+
+      webContents.once('did-finish-load', () => {
+        clearTimeout(timeout);
+        onDidFinish();
+      });
+
+      webContents.once('did-fail-load', () => {
+        clearTimeout(timeout);
+        onDidFail();
+      });
+
+      webContents.loadURL(url);
+    });
   }
 
   /**

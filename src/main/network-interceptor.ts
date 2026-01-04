@@ -32,9 +32,25 @@ export class NetworkInterceptor {
    * Attach to webContents and start intercepting
    */
   async attach(webContents: WebContents): Promise<void> {
+    // Skip if already attached to this webContents
+    if (this.debuggerAttached && this.webContents === webContents) {
+      return;
+    }
+
+    // Detach from previous webContents if different
+    if (this.debuggerAttached && this.webContents && this.webContents !== webContents) {
+      this.detach();
+    }
+
     this.webContents = webContents;
 
     try {
+      // Check if debugger is already attached
+      if (webContents.debugger.isAttached()) {
+        this.debuggerAttached = true;
+        return;
+      }
+
       // Attach debugger
       webContents.debugger.attach('1.3');
       this.debuggerAttached = true;
