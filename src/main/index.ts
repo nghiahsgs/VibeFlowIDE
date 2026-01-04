@@ -43,6 +43,7 @@ function createWindow(): void {
   // Setup IPC handlers
   setupTerminalIPC();
   setupBrowserIPC();
+  setupNetworkIPC();
 
   // Load renderer
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -106,6 +107,17 @@ function setupBrowserIPC(): void {
 
   ipcMain.on('browser:set-bounds', (_, bounds: { x: number; y: number; width: number; height: number }) => {
     browserManager?.setBounds(bounds);
+  });
+}
+
+// Network IPC handlers
+function setupNetworkIPC(): void {
+  ipcMain.on('network:clear', () => {
+    browserManager?.clearNetworkRequests();
+  });
+
+  ipcMain.handle('network:get-requests', () => {
+    return browserManager?.getNetworkRequests() || [];
   });
 }
 

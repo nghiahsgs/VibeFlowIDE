@@ -3,6 +3,7 @@
  * Provides navigation controls and exposes webContents for MCP
  */
 import { BrowserWindow, WebContentsView } from 'electron';
+import { NetworkInterceptor, NetworkRequest } from './network-interceptor';
 
 interface BrowserBounds {
   x: number;
@@ -16,9 +17,11 @@ export class BrowserManager {
   private parentWindow: BrowserWindow;
   private currentBounds: BrowserBounds = { x: 0, y: 0, width: 0, height: 0 };
   private consoleLogs: string[] = [];
+  private networkInterceptor: NetworkInterceptor;
 
   constructor(parentWindow: BrowserWindow) {
     this.parentWindow = parentWindow;
+    this.networkInterceptor = new NetworkInterceptor();
     this.create();
   }
 
@@ -56,8 +59,27 @@ export class BrowserManager {
       this.parentWindow.webContents.send('browser:navigated', url);
     });
 
+    // Attach network interceptor after page loads
+    this.view.webContents.on('did-finish-load', () => {
+      this.attachNetworkInterceptor();
+    });
+
+    // Setup network update callback
+    this.networkInterceptor.onUpdate((requests) => {
+      this.parentWindow.webContents.send('network:update', requests);
+    });
+
     // Load default page
     this.view.webContents.loadURL('https://www.google.com');
+  }
+
+  /**
+   * Attach network interceptor to webContents
+   */
+  private async attachNetworkInterceptor(): Promise<void> {
+    if (this.view) {
+      await this.networkInterceptor.attach(this.view.webContents);
+    }
   }
 
   /**
@@ -232,5 +254,19 @@ export class BrowserManager {
    */
   clearConsoleLogs(): void {
     this.consoleLogs = [];
+  }
+
+  /**
+   * Get network requests
+   */
+  getNetworkRequests(): NetworkRequest[] {
+    return this.networkInterceptor.getRequests();
+  }
+
+  /**
+   * Clear network requests
+   */
+  clearNetworkRequests(): void {
+    this.networkInterceptor.clear();
   }
 }

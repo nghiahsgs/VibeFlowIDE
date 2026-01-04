@@ -6,6 +6,7 @@ import net from 'net';
 import { BrowserManager } from './browser-manager';
 
 const MCP_BRIDGE_PORT = 9876;
+const MAX_PORT_ATTEMPTS = 10;
 
 interface MCPCommand {
   id: string;
@@ -21,15 +22,42 @@ interface MCPResponse {
 }
 
 export class MCPBridge {
-  private server: net.Server;
+  private server: net.Server | null = null;
   private browser: BrowserManager;
+  private port: number = MCP_BRIDGE_PORT;
 
   constructor(browser: BrowserManager) {
     this.browser = browser;
-    this.server = this.createServer();
+    this.startServer();
   }
 
-  private createServer(): net.Server {
+  private startServer(attempt: number = 0): void {
+    if (attempt >= MAX_PORT_ATTEMPTS) {
+      console.error(`MCP Bridge: Failed to find available port after ${MAX_PORT_ATTEMPTS} attempts`);
+      return;
+    }
+
+    const port = MCP_BRIDGE_PORT + attempt;
+    const server = this.createServer(port);
+
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`MCP Bridge: Port ${port} in use, trying ${port + 1}...`);
+        server.close();
+        this.startServer(attempt + 1);
+      } else {
+        console.error('MCP Bridge server error:', err);
+      }
+    });
+
+    server.listen(port, '127.0.0.1', () => {
+      this.port = port;
+      this.server = server;
+      console.log(`MCP Bridge listening on port ${port}`);
+    });
+  }
+
+  private createServer(port: number): net.Server {
     const server = net.createServer((socket) => {
       console.log('MCP client connected');
 
@@ -67,14 +95,6 @@ export class MCPBridge {
       socket.on('error', (err) => {
         console.error('MCP socket error:', err);
       });
-    });
-
-    server.listen(MCP_BRIDGE_PORT, '127.0.0.1', () => {
-      console.log(`MCP Bridge listening on port ${MCP_BRIDGE_PORT}`);
-    });
-
-    server.on('error', (err) => {
-      console.error('MCP Bridge server error:', err);
     });
 
     return server;
@@ -167,6 +187,10 @@ export class MCPBridge {
   }
 
   close(): void {
-    this.server.close();
+    this.server?.close();
+  }
+
+  getPort(): number {
+    return this.port;
   }
 }

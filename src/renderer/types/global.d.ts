@@ -22,10 +22,35 @@ interface BrowserAPI {
   onNavigate: (callback: (url: string) => void) => () => void;
 }
 
+interface NetworkRequest {
+  id: string;
+  url: string;
+  method: string;
+  status: number;
+  statusText: string;
+  type: string;
+  mimeType: string;
+  startTime: number;
+  endTime?: number;
+  duration?: number;
+  requestHeaders: Record<string, string>;
+  responseHeaders: Record<string, string>;
+  requestBody?: string;
+  responseSize: number;
+  error?: string;
+}
+
+interface NetworkAPI {
+  onUpdate: (callback: (requests: NetworkRequest[]) => void) => () => void;
+  clear: () => void;
+  getRequests: () => Promise<NetworkRequest[]>;
+}
+
 declare global {
   interface Window {
     terminal: TerminalAPI;
     browser: BrowserAPI;
+    network: NetworkAPI;
   }
 }
 

@@ -36,9 +36,21 @@ const browserAPI = {
   }
 };
 
+// Network API
+const networkAPI = {
+  onUpdate: (callback: (requests: unknown[]) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, requests: unknown[]) => callback(requests);
+    ipcRenderer.on('network:update', handler);
+    return () => ipcRenderer.removeListener('network:update', handler);
+  },
+  clear: () => ipcRenderer.send('network:clear'),
+  getRequests: () => ipcRenderer.invoke('network:get-requests') as Promise<unknown[]>
+};
+
 // Expose APIs to renderer
 contextBridge.exposeInMainWorld('terminal', terminalAPI);
 contextBridge.exposeInMainWorld('browser', browserAPI);
+contextBridge.exposeInMainWorld('network', networkAPI);
 
 // Type declarations for renderer
 export type TerminalAPI = typeof terminalAPI;

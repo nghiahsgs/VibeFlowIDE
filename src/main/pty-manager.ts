@@ -4,6 +4,7 @@
  */
 import * as pty from 'node-pty';
 import os from 'os';
+import fs from 'fs';
 
 interface PtyInstance {
   process: pty.IPty;
@@ -14,61 +15,85 @@ export class PtyManager {
   private instances: Map<string, PtyInstance> = new Map();
 
   /**
+   * Find a valid shell on the system
+   */
+  private findShell(): string {
+    if (os.platform() === 'win32') {
+      return 'powershell.exe';
+    }
+
+    // Check shells in order of preference
+    const shells = ['/bin/zsh', '/bin/bash', '/bin/sh'];
+
+    for (const shell of shells) {
+      try {
+        if (fs.existsSync(shell)) {
+          const stats = fs.statSync(shell);
+          if (stats.isFile()) {
+            console.log(`Found shell: ${shell}`);
+            return shell;
+          }
+        }
+      } catch {
+        // Continue to next shell
+      }
+    }
+
+    // Fallback
+    return '/bin/sh';
+  }
+
+  /**
    * Create a new terminal instance
    */
   create(id: string, onData: (data: string) => void): void {
     // Kill existing instance if any
     this.kill(id);
 
-    // Use full path for shell to avoid posix_spawnp issues
-    let shell: string;
-    let shellArgs: string[] = [];
+    const shell = this.findShell();
+    const shellArgs = os.platform() === 'win32' ? [] : ['-l'];
+    const homeDir = os.homedir();
 
-    if (os.platform() === 'win32') {
-      shell = 'powershell.exe';
-    } else {
-      // Try to find a valid shell
-      const possibleShells = [
-        process.env.SHELL,
-        '/bin/zsh',
-        '/bin/bash',
-        '/bin/sh'
-      ].filter(Boolean) as string[];
+    console.log(`[PTY] Creating terminal ${id}`);
+    console.log(`[PTY] Shell: ${shell}`);
+    console.log(`[PTY] Home: ${homeDir}`);
 
-      shell = possibleShells[0] || '/bin/sh';
-      shellArgs = ['-l']; // Login shell
+    try {
+      const ptyProcess = pty.spawn(shell, shellArgs, {
+        name: 'xterm-256color',
+        cols: 80,
+        rows: 30,
+        cwd: homeDir,
+        env: {
+          PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+          HOME: homeDir,
+          SHELL: shell,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          LANG: 'en_US.UTF-8',
+          USER: process.env.USER || os.userInfo().username
+        }
+      });
+
+      ptyProcess.onData(onData);
+
+      ptyProcess.onExit(({ exitCode }) => {
+        console.log(`[PTY] Terminal ${id} exited with code ${exitCode}`);
+        this.instances.delete(id);
+      });
+
+      this.instances.set(id, {
+        process: ptyProcess,
+        onDataCallback: onData
+      });
+
+      console.log(`[PTY] Terminal ${id} created successfully`);
+    } catch (error) {
+      console.error(`[PTY] Failed to create terminal ${id}:`, error);
+      // Send error message to terminal UI
+      onData(`\r\n\x1b[31mError: Failed to spawn shell (${shell})\x1b[0m\r\n`);
+      onData(`\x1b[33m${error}\x1b[0m\r\n`);
     }
-
-    console.log(`Spawning shell: ${shell} with args: ${shellArgs.join(' ')}`);
-
-    const ptyProcess = pty.spawn(shell, shellArgs, {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 30,
-      cwd: os.homedir(),
-      env: {
-        ...process.env,
-        TERM: 'xterm-256color',
-        COLORTERM: 'truecolor',
-        LANG: 'en_US.UTF-8',
-        HOME: os.homedir(),
-        SHELL: shell
-      } as { [key: string]: string }
-    });
-
-    ptyProcess.onData(onData);
-
-    ptyProcess.onExit(({ exitCode }) => {
-      console.log(`Terminal ${id} exited with code ${exitCode}`);
-      this.instances.delete(id);
-    });
-
-    this.instances.set(id, {
-      process: ptyProcess,
-      onDataCallback: onData
-    });
-
-    console.log(`Terminal ${id} created with shell: ${shell}`);
   }
 
   /**

@@ -100,9 +100,6 @@ export function TerminalPanel() {
 
   return (
     <div className="terminal-panel">
-      <div className="panel-header">
-        <span className="panel-title">Terminal</span>
-      </div>
       <div ref={containerRef} className="terminal-container" />
     </div>
   );
