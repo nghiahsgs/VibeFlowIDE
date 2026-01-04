@@ -31,7 +31,7 @@ export function LeftPanel() {
 
       <div className="left-panel-content">
         {/* Terminal always mounted, hidden when not active */}
-        <div style={{ display: activeTab === 'terminal' ? 'flex' : 'none', height: '100%' }}>
+        <div style={{ display: activeTab === 'terminal' ? 'flex' : 'none', width: '100%', height: '100%' }}>
           <TerminalPanel />
         </div>
         {/* Network only mounted when active */}

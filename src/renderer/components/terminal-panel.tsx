@@ -84,15 +84,31 @@ export function TerminalPanel() {
     });
 
     // Handle window resize
-    const resizeObserver = new ResizeObserver(handleResize);
+    const resizeObserver = new ResizeObserver(() => {
+      // Debounce resize to avoid too many calls
+      requestAnimationFrame(() => {
+        if (fitAddonRef.current && terminalRef.current) {
+          fitAddonRef.current.fit();
+          const { cols, rows } = terminalRef.current;
+          window.terminal.resize(TERMINAL_ID, cols, rows);
+        }
+      });
+    });
     resizeObserver.observe(containerRef.current);
 
-    // Initial fit after a short delay to ensure container is sized
-    setTimeout(() => {
-      fitAddon.fit();
-      const { cols, rows } = terminal;
-      window.terminal.resize(TERMINAL_ID, cols, rows);
-    }, 100);
+    // Multiple fit attempts to ensure proper sizing
+    const fitTerminal = () => {
+      if (fitAddonRef.current && terminalRef.current) {
+        fitAddonRef.current.fit();
+        const { cols, rows } = terminalRef.current;
+        window.terminal.resize(TERMINAL_ID, cols, rows);
+      }
+    };
+
+    // Fit at different intervals to handle layout settling
+    setTimeout(fitTerminal, 50);
+    setTimeout(fitTerminal, 200);
+    setTimeout(fitTerminal, 500);
 
     // Cleanup only on actual unmount (not strict mode re-run)
     return () => {
