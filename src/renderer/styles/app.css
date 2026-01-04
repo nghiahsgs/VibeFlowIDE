@@ -404,3 +404,160 @@
      so we can calculate correct bounds */
   position: relative;
 }
+
+/* MCP Panel */
+.mcp-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+  background: #1e1e1e;
+  overflow-y: auto;
+  font-size: 12px;
+  color: #cccccc;
+}
+
+.mcp-status {
+  padding: 12px;
+  background: #252526;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.status-row:last-child {
+  margin-bottom: 0;
+}
+
+.status-label {
+  color: #888888;
+  min-width: 80px;
+}
+
+.status-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status-badge.connected {
+  background: rgba(13, 188, 121, 0.2);
+  color: #0dbc79;
+}
+
+.status-badge.disconnected {
+  background: rgba(205, 49, 49, 0.2);
+  color: #cd3131;
+}
+
+.status-badge.checking {
+  background: rgba(229, 229, 16, 0.2);
+  color: #e5e510;
+}
+
+.status-value {
+  color: #cccccc;
+  font-family: monospace;
+}
+
+.mcp-section {
+  margin-bottom: 16px;
+}
+
+.mcp-section h3 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888888;
+  margin: 0 0 8px 0;
+}
+
+.mcp-hint {
+  color: #888888;
+  margin: 0 0 8px 0;
+  font-size: 11px;
+}
+
+.config-block {
+  position: relative;
+  background: #2d2d2d;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.config-block pre {
+  margin: 0;
+  padding: 12px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-x: auto;
+  color: #9cdcfe;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  background: #007acc;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.copy-btn:hover {
+  background: #0098ff;
+}
+
+.tools-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tools-list li {
+  padding: 4px 0;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.tools-list li:last-child {
+  border-bottom: none;
+}
+
+.tools-list code {
+  color: #dcdcaa;
+  background: #2d2d2d;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.steps-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.steps-list li {
+  padding: 4px 0;
+  color: #cccccc;
+}
+
+.steps-list code {
+  color: #ce9178;
+  background: #2d2d2d;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
