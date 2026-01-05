@@ -97,8 +97,7 @@ export class SimulatorManager {
       proc.on('close', (code) => {
         clearTimeout(timeout);
         if (code === 0) {
-          // Open Simulator.app to show the device
-          spawn('open', ['-a', 'Simulator']);
+          // Don't open Simulator.app - we'll stream in IDE instead
           resolve();
         } else {
           reject(new Error(`Failed to boot device (exit code ${code})`));
@@ -190,13 +189,15 @@ export class SimulatorManager {
     // Always stop existing streaming first to prevent memory leaks
     this.stopStreaming();
 
-    // Check screen recording permission
-    const permission = systemPreferences.getMediaAccessStatus('screen');
-    if (permission !== 'granted') {
-      // Fall back to xcrun polling
-      this.startPollingStream(frameRate);
-      return;
-    }
+    // Always use xcrun simctl screenshot polling - no need for Simulator.app to be visible
+    // This allows headless operation where only the IDE shows the simulator screen
+    console.log('[Simulator] Starting xcrun polling stream');
+    this.startPollingStream(frameRate);
+    return;
+
+    // Note: desktopCapturer approach commented out - requires Simulator.app window to be visible
+    // const permission = systemPreferences.getMediaAccessStatus('screen');
+    // if (permission === 'granted') { ... }
 
     this.isStreaming = true;
 
@@ -243,15 +244,17 @@ export class SimulatorManager {
     const effectiveRate = Math.min(frameRate, 5);
 
     this.isStreaming = true;
+    console.log('[Simulator] Polling started at', effectiveRate, 'fps');
 
     const captureFrame = async () => {
       if (!this.isStreaming) return;
 
       try {
         const base64 = await this.screenshot();
+        console.log('[Simulator] Frame captured, size:', base64.length);
         this.parentWindow.webContents.send('simulator:frame', base64);
-      } catch {
-        // Ignore errors, device might not be booted
+      } catch (err) {
+        console.error('[Simulator] Polling capture error:', err);
       }
     };
 
