@@ -9,7 +9,10 @@
     "preview": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
     "rebuild": "electron-rebuild -f -w node-pty",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dist": "electron-vite build && electron-builder --mac",
+    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:linux": "electron-vite build && electron-builder --linux"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",
