@@ -1,5 +1,6 @@
 appId: com.vibeflow.ide
 productName: VibeFlow IDE
+icon: resources/icon.png
 directories:
   buildResources: resources
 files:
