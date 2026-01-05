@@ -2,7 +2,7 @@
  * Simulator Manager - Controls iOS Simulator via xcrun simctl
  * Provides device management, screen capture, and interaction APIs
  */
-import { BrowserWindow, desktopCapturer, systemPreferences } from 'electron';
+import { BrowserWindow, desktopCapturer, systemPreferences, nativeImage } from 'electron';
 import { execSync, spawn } from 'child_process';
 import { readFileSync, unlinkSync, existsSync } from 'fs';
 import { SimulatorDevice, SimulatorStatus } from './simulator-types';
@@ -141,7 +141,7 @@ export class SimulatorManager {
 
   /**
    * Take screenshot using xcrun simctl
-   * Returns base64 encoded PNG
+   * Returns base64 encoded JPEG (resized for performance)
    */
   async screenshot(): Promise<string> {
     const tmpPath = `/tmp/vibeflow-sim-${Date.now()}-${Math.random().toString(36).slice(2)}.png`;
@@ -151,7 +151,6 @@ export class SimulatorManager {
 
       const timeout = setTimeout(() => {
         proc.kill('SIGKILL');
-        // Clean up temp file on timeout
         try { unlinkSync(tmpPath); } catch { /* ignore */ }
         reject(new Error('Screenshot timeout'));
       }, 10000);
@@ -160,14 +159,25 @@ export class SimulatorManager {
         clearTimeout(timeout);
         try {
           if (code === 0 && existsSync(tmpPath)) {
-            const buffer = readFileSync(tmpPath);
+            // Load and resize image for better performance
+            const img = nativeImage.createFromPath(tmpPath);
             unlinkSync(tmpPath);
-            resolve(buffer.toString('base64'));
+
+            // Resize to ~400px width (maintain aspect ratio)
+            const size = img.getSize();
+            const targetWidth = 400;
+            const targetHeight = Math.round((size.height / size.width) * targetWidth);
+            const resized = img.resize({ width: targetWidth, height: targetHeight, quality: 'good' });
+
+            // Convert to JPEG for smaller size
+            const jpeg = resized.toJPEG(85);
+            const base64 = jpeg.toString('base64');
+            console.log('[Simulator] JPEG base64 starts with:', base64.substring(0, 20));
+            resolve(base64);
           } else {
             reject(new Error('Screenshot failed - is simulator booted?'));
           }
         } catch (e) {
-          // Always try to clean up temp file
           try { unlinkSync(tmpPath); } catch { /* ignore */ }
           reject(e);
         }
@@ -175,7 +185,6 @@ export class SimulatorManager {
 
       proc.on('error', (err) => {
         clearTimeout(timeout);
-        // Clean up temp file on error
         try { unlinkSync(tmpPath); } catch { /* ignore */ }
         reject(err);
       });
@@ -251,8 +260,13 @@ export class SimulatorManager {
 
       try {
         const base64 = await this.screenshot();
-        console.log('[Simulator] Frame captured, size:', base64.length);
-        this.parentWindow.webContents.send('simulator:frame', base64);
+        console.log('[Simulator] Frame captured, size:', base64.length, 'sending to renderer...');
+        if (this.parentWindow && !this.parentWindow.isDestroyed()) {
+          this.parentWindow.webContents.send('simulator:frame', base64);
+          console.log('[Simulator] Frame sent to renderer');
+        } else {
+          console.log('[Simulator] Window not available');
+        }
       } catch (err) {
         console.error('[Simulator] Polling capture error:', err);
       }

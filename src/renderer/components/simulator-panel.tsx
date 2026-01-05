@@ -23,7 +23,22 @@ export function SimulatorPanel() {
 
     // Subscribe to frame updates
     const unsubscribe = window.simulator.onFrame((base64) => {
-      setCurrentFrame(base64);
+      if (base64 && base64.length > 0) {
+        // Convert base64 to blob URL for better compatibility
+        try {
+          const byteCharacters = atob(base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+          setCurrentFrame(url);
+        } catch (e) {
+          console.error('[SimPanel] Failed to convert frame:', e);
+        }
+      }
     });
 
     return () => {
@@ -206,6 +221,33 @@ export function SimulatorPanel() {
         >
           ↻
         </button>
+
+        {/* Debug: Manual test button */}
+        <button
+          className="toolbar-btn"
+          onClick={async () => {
+            console.log('Manual screenshot test...');
+            try {
+              const base64 = await window.simulator.screenshot();
+              console.log('Screenshot received, length:', base64?.length);
+              // Convert to blob URL
+              const byteCharacters = atob(base64);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: 'image/jpeg' });
+              const url = URL.createObjectURL(blob);
+              setCurrentFrame(url);
+            } catch (e) {
+              console.error('Screenshot error:', e);
+            }
+          }}
+          title="Test Screenshot"
+        >
+          🔍
+        </button>
       </div>
 
       {/* Error Display */}
@@ -221,7 +263,7 @@ export function SimulatorPanel() {
         {currentFrame ? (
           <img
             ref={imgRef}
-            src={`data:image/png;base64,${currentFrame}`}
+            src={currentFrame}
             alt="iOS Simulator"
             className="simulator-frame"
           />
