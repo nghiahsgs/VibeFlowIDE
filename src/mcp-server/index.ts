@@ -298,11 +298,17 @@ async function main() {
             url: string;
             method: string;
             status?: number;
-            timestamp: number;
+            startTime: number;
+            endTime?: number;
+            duration?: number;
+            type: string;
+            mimeType: string;
             requestHeaders?: Record<string, string>;
             responseHeaders?: Record<string, string>;
             requestBody?: string;
             responseBody?: string;
+            responseSize: number;
+            error?: string;
           }>;
 
           if (!requests || requests.length === 0) {
@@ -315,8 +321,11 @@ async function main() {
             const parts = [
               `[${idx + 1}] ${req.method} ${req.url}`,
               `    Status: ${req.status || 'pending'}`,
-              `    Time: ${new Date(req.timestamp).toISOString()}`
-            ];
+              `    Type: ${req.type}`,
+              `    Time: ${new Date(req.startTime).toISOString()}`,
+              req.duration ? `    Duration: ${req.duration}ms` : null,
+              req.error ? `    Error: ${req.error}` : null
+            ].filter(Boolean) as string[];
 
             if (req.requestHeaders) {
               parts.push(`    Request Headers: ${JSON.stringify(req.requestHeaders, null, 2)}`);
