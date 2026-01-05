@@ -20,12 +20,19 @@ export function SimulatorPanel() {
   useEffect(() => {
     loadDevices();
     loadStatus();
+  }, []);
 
-    // Subscribe to frame updates
-    const unsubscribe = window.simulator.onFrame((base64) => {
-      if (base64 && base64.length > 0) {
-        // Convert base64 to blob URL for better compatibility
-        try {
+  // Polling for frames (simpler than IPC streaming)
+  useEffect(() => {
+    if (!status?.bootedDevice) return;
+
+    let cancelled = false;
+    const pollFrame = async () => {
+      if (cancelled) return;
+      try {
+        const base64 = await window.simulator.screenshot();
+        if (base64 && !cancelled) {
+          // Convert base64 to blob URL
           const byteCharacters = atob(base64);
           const byteNumbers = new Array(byteCharacters.length);
           for (let i = 0; i < byteCharacters.length; i++) {
@@ -34,18 +41,23 @@ export function SimulatorPanel() {
           const byteArray = new Uint8Array(byteNumbers);
           const blob = new Blob([byteArray], { type: 'image/jpeg' });
           const url = URL.createObjectURL(blob);
+          // Revoke old URL to prevent memory leak
+          if (currentFrame?.startsWith('blob:')) {
+            URL.revokeObjectURL(currentFrame);
+          }
           setCurrentFrame(url);
-        } catch (e) {
-          console.error('[SimPanel] Failed to convert frame:', e);
         }
+      } catch {
+        // Ignore errors
       }
-    });
-
-    return () => {
-      unsubscribe();
-      window.simulator.stopStreaming();
+      if (!cancelled) {
+        setTimeout(pollFrame, 500); // Poll every 500ms (2fps)
+      }
     };
-  }, []);
+
+    pollFrame();
+    return () => { cancelled = true; };
+  }, [status?.bootedDevice]);
 
   const loadDevices = useCallback(async () => {
     try {
@@ -68,11 +80,7 @@ export function SimulatorPanel() {
     try {
       const s = await window.simulator.getStatus();
       setStatus(s);
-
-      // Start streaming if device is booted
-      if (s.bootedDevice) {
-        window.simulator.startStreaming(30);
-      }
+      // Note: Using polling instead of IPC streaming for frame updates
     } catch (e) {
       console.error('Failed to load status:', e);
     }
@@ -90,7 +98,7 @@ export function SimulatorPanel() {
       await new Promise(resolve => setTimeout(resolve, 3000));
       await loadDevices();
       await loadStatus();
-      window.simulator.startStreaming(30);
+      // Polling will start automatically via useEffect when status changes
     } catch (e) {
       setError('Failed to boot simulator');
       console.error(e);
@@ -107,7 +115,6 @@ export function SimulatorPanel() {
     setError(null);
 
     try {
-      window.simulator.stopStreaming();
       await window.simulator.shutdown(booted.udid);
       setCurrentFrame(null);
       await loadDevices();
