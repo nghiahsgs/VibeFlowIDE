@@ -26,7 +26,7 @@ interface BrowserAPI {
   screenshot: () => Promise<string>;
 }
 
-interface NetworkRequest {
+export interface NetworkRequest {
   id: string;
   url: string;
   method: string;
@@ -51,7 +51,7 @@ interface NetworkAPI {
   getRequests: () => Promise<NetworkRequest[]>;
 }
 
-interface PortProcess {
+export interface PortProcess {
   pid: number;
   name: string;
   port: number;

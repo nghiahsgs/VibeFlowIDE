@@ -135,8 +135,13 @@ export class MCPBridge {
         }
 
         case 'getConsoleLogs': {
-          const logs = this.browser.getConsoleLogs();
+          const logs = await this.browser.getConsoleLogs();
           return { id, success: true, data: logs };
+        }
+
+        case 'getNetworkRequests': {
+          const requests = this.browser.getNetworkRequests();
+          return { id, success: true, data: requests };
         }
 
         case 'typeText': {

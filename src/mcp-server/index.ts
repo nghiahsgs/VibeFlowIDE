@@ -78,6 +78,15 @@ const tools: Tool[] = [
     }
   },
   {
+    name: 'browser_get_network_requests',
+    description: 'Get network requests captured from the browser',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
     name: 'browser_type_text',
     description: 'Type text into an input element',
     inputSchema: {
@@ -280,6 +289,56 @@ async function main() {
           const logs = (await bridge.sendCommand('getConsoleLogs')) as string[];
           return {
             content: [{ type: 'text', text: logs.join('\n') || 'No console logs' }]
+          };
+        }
+
+        case 'browser_get_network_requests': {
+          const requests = (await bridge.sendCommand('getNetworkRequests')) as Array<{
+            id: string;
+            url: string;
+            method: string;
+            status?: number;
+            timestamp: number;
+            requestHeaders?: Record<string, string>;
+            responseHeaders?: Record<string, string>;
+            requestBody?: string;
+            responseBody?: string;
+          }>;
+
+          if (!requests || requests.length === 0) {
+            return {
+              content: [{ type: 'text', text: 'No network requests captured' }]
+            };
+          }
+
+          const formatted = requests.map((req, idx) => {
+            const parts = [
+              `[${idx + 1}] ${req.method} ${req.url}`,
+              `    Status: ${req.status || 'pending'}`,
+              `    Time: ${new Date(req.timestamp).toISOString()}`
+            ];
+
+            if (req.requestHeaders) {
+              parts.push(`    Request Headers: ${JSON.stringify(req.requestHeaders, null, 2)}`);
+            }
+
+            if (req.responseHeaders) {
+              parts.push(`    Response Headers: ${JSON.stringify(req.responseHeaders, null, 2)}`);
+            }
+
+            if (req.requestBody) {
+              parts.push(`    Request Body: ${req.requestBody}`);
+            }
+
+            if (req.responseBody) {
+              parts.push(`    Response Body: ${req.responseBody}`);
+            }
+
+            return parts.join('\n');
+          });
+
+          return {
+            content: [{ type: 'text', text: formatted.join('\n\n') }]
           };
         }
 

@@ -40,14 +40,20 @@ export class BrowserManager {
     // Add to parent window
     this.parentWindow.contentView.addChildView(this.view);
 
-    // Capture console logs
+    // Capture console logs with proper object serialization
     this.view.webContents.on('console-message', (_, level, message) => {
-      const logEntry = `[${['verbose', 'info', 'warning', 'error'][level] || 'log'}] ${message}`;
+      const levelName = ['verbose', 'info', 'warning', 'error'][level] || 'log';
+      const logEntry = `[${levelName}] ${message}`;
       this.consoleLogs.push(logEntry);
       // Keep only last 100 logs
       if (this.consoleLogs.length > 100) {
         this.consoleLogs.shift();
       }
+    });
+
+    // Inject console override to serialize objects as JSON
+    this.view.webContents.on('did-finish-load', () => {
+      this.injectConsoleOverride();
     });
 
     // Handle navigation events
@@ -71,6 +77,76 @@ export class BrowserManager {
 
     // Load default page
     this.view.webContents.loadURL('https://www.google.com');
+  }
+
+  /**
+   * Inject console override to properly serialize objects
+   */
+  private async injectConsoleOverride(): Promise<void> {
+    if (!this.view) return;
+
+    try {
+      await this.view.webContents.executeJavaScript(`
+        (function() {
+          // Create global console history array if it doesn't exist
+          if (!window.__consoleHistory) {
+            window.__consoleHistory = [];
+          }
+
+          // Store original console methods
+          const originalConsole = {
+            log: console.log,
+            info: console.info,
+            warn: console.warn,
+            error: console.error
+          };
+
+          // Helper to serialize any value to string with JSON formatting
+          function serializeValue(val) {
+            try {
+              if (val === null) return 'null';
+              if (val === undefined) return 'undefined';
+              if (typeof val === 'string') return val;
+              if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+              if (typeof val === 'function') return val.toString();
+              if (val instanceof Error) return val.stack || val.message;
+
+              // For objects and arrays, use JSON.stringify with pretty formatting
+              return JSON.stringify(val, (key, value) => {
+                // Handle circular references
+                if (typeof value === 'object' && value !== null) {
+                  if (value instanceof Error) return value.message;
+                  return value;
+                }
+                return value;
+              }, 2);
+            } catch (err) {
+              return String(val);
+            }
+          }
+
+          // Override console methods to capture in history
+          ['log', 'info', 'warn', 'error'].forEach(method => {
+            console[method] = function(...args) {
+              // Call original method for DevTools
+              originalConsole[method].apply(console, args);
+
+              // Serialize all arguments and store in history
+              const serialized = args.map(serializeValue).join(' ');
+              const levelName = method === 'warn' ? 'warning' : method;
+              window.__consoleHistory.push('[' + levelName + '] ' + serialized);
+
+              // Keep only last 100 logs
+              if (window.__consoleHistory.length > 100) {
+                window.__consoleHistory.shift();
+              }
+            };
+          });
+        })();
+      `);
+    } catch (error) {
+      console.error('Failed to inject console override:', error);
+    }
   }
 
   /**
@@ -299,17 +375,41 @@ export class BrowserManager {
   }
 
   /**
-   * Get console logs
+   * Get console logs from injected history
    */
-  getConsoleLogs(): string[] {
+  async getConsoleLogs(): Promise<string[]> {
+    if (!this.view) return [];
+
+    try {
+      // Try to get from injected console history first
+      const history = await this.view.webContents.executeJavaScript(
+        'window.__consoleHistory || []'
+      );
+      if (Array.isArray(history) && history.length > 0) {
+        return history;
+      }
+    } catch (error) {
+      console.error('Failed to get console history:', error);
+    }
+
+    // Fallback to captured logs from console-message event
     return [...this.consoleLogs];
   }
 
   /**
    * Clear console logs
    */
-  clearConsoleLogs(): void {
+  async clearConsoleLogs(): Promise<void> {
     this.consoleLogs = [];
+
+    // Also clear injected console history
+    if (this.view) {
+      try {
+        await this.view.webContents.executeJavaScript('window.__consoleHistory = [];');
+      } catch (error) {
+        console.error('Failed to clear console history:', error);
+      }
+    }
   }
 
   /**

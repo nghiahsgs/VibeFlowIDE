@@ -119,7 +119,7 @@ function setupBrowserIPC(): void {
     browserManager?.setBounds(bounds);
   });
 
-  ipcMain.handle('browser:console-logs', () => {
+  ipcMain.handle('browser:console-logs', async () => {
     return browserManager?.getConsoleLogs() || [];
   });
 

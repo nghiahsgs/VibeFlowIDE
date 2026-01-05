@@ -3,6 +3,7 @@
  * Displays network requests captured via CDP
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
+import type { NetworkRequest } from '../types/global';
 
 // Status code color mapping
 function getStatusColor(status: number): string {
@@ -250,7 +251,7 @@ export function NetworkPanel() {
                 {Object.entries(selectedRequest.responseHeaders).map(([key, value]) => (
                   <div key={key} className="detail-row">
                     <span className="detail-label">{key}:</span>
-                    <span className="detail-value">{value}</span>
+                    <span className="detail-value">{String(value)}</span>
                   </div>
                 ))}
               </div>
@@ -260,7 +261,7 @@ export function NetworkPanel() {
                 {Object.entries(selectedRequest.requestHeaders).map(([key, value]) => (
                   <div key={key} className="detail-row">
                     <span className="detail-label">{key}:</span>
-                    <span className="detail-value">{value}</span>
+                    <span className="detail-value">{String(value)}</span>
                   </div>
                 ))}
               </div>
