@@ -12,6 +12,7 @@ asarUnpack:
   - '**/*.node'
 mac:
   category: public.app-category.developer-tools
+  icon: resources/icon.icns
   target:
     - dmg
     - zip
@@ -22,10 +23,12 @@ mac:
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
 win:
+  icon: resources/icon.ico
   target:
     - nsis
     - zip
 linux:
+  icon: resources/icon.png
   target:
     - AppImage
     - deb
