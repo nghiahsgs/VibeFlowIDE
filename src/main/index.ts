@@ -9,12 +9,14 @@ import { PtyManager } from './pty-manager';
 import { BrowserManager } from './browser-manager';
 import { MCPBridge } from './mcp-bridge';
 import { PortManager } from './port-manager';
+import { SimulatorManager } from './simulator-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let ptyManager: PtyManager | null = null;
 let browserManager: BrowserManager | null = null;
 let mcpBridge: MCPBridge | null = null;
 let portManager: PortManager | null = null;
+let simulatorManager: SimulatorManager | null = null;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -41,7 +43,8 @@ function createWindow(): void {
   // Initialize managers
   ptyManager = new PtyManager();
   browserManager = new BrowserManager(mainWindow);
-  mcpBridge = new MCPBridge(browserManager);
+  simulatorManager = new SimulatorManager(mainWindow);
+  mcpBridge = new MCPBridge(browserManager, simulatorManager);
   portManager = new PortManager();
 
   // Setup IPC handlers
@@ -49,6 +52,7 @@ function createWindow(): void {
   setupBrowserIPC();
   setupNetworkIPC();
   setupPortsIPC();
+  setupSimulatorIPC();
 
   // Load renderer
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -61,6 +65,7 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     ptyManager?.killAll();
+    simulatorManager?.destroy();
     mcpBridge?.close();
     mainWindow = null;
   });
@@ -155,6 +160,54 @@ function setupPortsIPC(): void {
 
   ipcMain.handle('ports:kill-port', async (_, port: number) => {
     return portManager?.killPort(port) || false;
+  });
+}
+
+// Simulator IPC handlers
+function setupSimulatorIPC(): void {
+  ipcMain.handle('simulator:list-devices', () => {
+    return simulatorManager?.listDevices() || [];
+  });
+
+  ipcMain.handle('simulator:boot', async (_, udid: string) => {
+    await simulatorManager?.bootDevice(udid);
+    return true;
+  });
+
+  ipcMain.handle('simulator:shutdown', async (_, udid: string) => {
+    await simulatorManager?.shutdownDevice(udid);
+    return true;
+  });
+
+  ipcMain.handle('simulator:screenshot', async () => {
+    return simulatorManager?.screenshot() || '';
+  });
+
+  ipcMain.handle('simulator:status', async () => {
+    return simulatorManager?.getStatus();
+  });
+
+  ipcMain.handle('simulator:tap', async (_, { x, y }: { x: number; y: number }) => {
+    await simulatorManager?.tap(x, y);
+    return true;
+  });
+
+  ipcMain.handle('simulator:launch-app', async (_, bundleId: string) => {
+    await simulatorManager?.launchApp(bundleId);
+    return true;
+  });
+
+  ipcMain.handle('simulator:open-url', async (_, url: string) => {
+    await simulatorManager?.openUrl(url);
+    return true;
+  });
+
+  ipcMain.on('simulator:start-streaming', (_, frameRate?: number) => {
+    simulatorManager?.startStreaming(frameRate);
+  });
+
+  ipcMain.on('simulator:stop-streaming', () => {
+    simulatorManager?.stopStreaming();
   });
 }
 

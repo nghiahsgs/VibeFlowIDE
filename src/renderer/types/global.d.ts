@@ -65,12 +65,44 @@ interface PortsAPI {
   killPort: (port: number) => Promise<boolean>;
 }
 
+export interface SimulatorDevice {
+  udid: string;
+  name: string;
+  state: 'Booted' | 'Shutdown' | 'Shutting Down' | 'Creating';
+  isAvailable: boolean;
+  deviceTypeIdentifier: string;
+  runtime: string;
+  runtimeVersion: string;
+}
+
+export interface SimulatorStatus {
+  available: boolean;
+  bootedDevice: SimulatorDevice | null;
+  isStreaming: boolean;
+  permissionGranted: boolean;
+}
+
+interface SimulatorAPI {
+  listDevices: () => Promise<SimulatorDevice[]>;
+  boot: (udid: string) => Promise<boolean>;
+  shutdown: (udid: string) => Promise<boolean>;
+  screenshot: () => Promise<string>;
+  getStatus: () => Promise<SimulatorStatus>;
+  tap: (x: number, y: number) => Promise<boolean>;
+  launchApp: (bundleId: string) => Promise<boolean>;
+  openUrl: (url: string) => Promise<boolean>;
+  startStreaming: (frameRate?: number) => void;
+  stopStreaming: () => void;
+  onFrame: (callback: (base64: string) => void) => () => void;
+}
+
 declare global {
   interface Window {
     terminal: TerminalAPI;
     browser: BrowserAPI;
     network: NetworkAPI;
     ports: PortsAPI;
+    simulator: SimulatorAPI;
   }
 }
 

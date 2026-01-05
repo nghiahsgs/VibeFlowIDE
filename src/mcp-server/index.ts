@@ -15,8 +15,8 @@ import net from 'net';
 
 const MCP_BRIDGE_PORT = 9876;
 
-// Tool definitions
-const tools: Tool[] = [
+// Browser tool definitions
+const browserTools: Tool[] = [
   {
     name: 'browser_screenshot',
     description: 'Take a screenshot of the embedded browser in VibeFlow IDE',
@@ -128,6 +128,113 @@ const tools: Tool[] = [
     }
   }
 ];
+
+// iOS Simulator tool definitions
+const simulatorTools: Tool[] = [
+  {
+    name: 'simulator_screenshot',
+    description: 'Take a screenshot of the iOS Simulator',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'simulator_tap',
+    description: 'Tap at specific coordinates on the iOS Simulator screen',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        x: {
+          type: 'number',
+          description: 'X coordinate (from left)'
+        },
+        y: {
+          type: 'number',
+          description: 'Y coordinate (from top)'
+        }
+      },
+      required: ['x', 'y']
+    }
+  },
+  {
+    name: 'simulator_launch_app',
+    description: 'Launch an app in the iOS Simulator by bundle ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bundleId: {
+          type: 'string',
+          description: 'App bundle identifier (e.g., com.apple.mobilesafari)'
+        }
+      },
+      required: ['bundleId']
+    }
+  },
+  {
+    name: 'simulator_open_url',
+    description: 'Open a URL in the iOS Simulator',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'URL to open (e.g., https://example.com)'
+        }
+      },
+      required: ['url']
+    }
+  },
+  {
+    name: 'simulator_list_devices',
+    description: 'List available iOS Simulator devices',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'simulator_boot',
+    description: 'Boot a specific iOS Simulator device',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        udid: {
+          type: 'string',
+          description: 'Device UDID (get from simulator_list_devices)'
+        },
+        deviceName: {
+          type: 'string',
+          description: 'Or use device name (e.g., "iPhone 15 Pro")'
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'simulator_shutdown',
+    description: 'Shutdown the currently booted iOS Simulator',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'simulator_get_status',
+    description: 'Get the current iOS Simulator status',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  }
+];
+
+// Combined tools
+const tools: Tool[] = [...browserTools, ...simulatorTools];
 
 // Bridge to Electron app
 class ElectronBridge {
@@ -377,6 +484,85 @@ async function main() {
           const url = await bridge.sendCommand('getCurrentURL');
           return {
             content: [{ type: 'text', text: String(url) }]
+          };
+        }
+
+        // iOS Simulator tools
+        case 'simulator_screenshot': {
+          const data = await bridge.sendCommand('simulator:screenshot');
+          return {
+            content: [
+              {
+                type: 'image',
+                data: data as string,
+                mimeType: 'image/png'
+              }
+            ]
+          };
+        }
+
+        case 'simulator_tap': {
+          const result = await bridge.sendCommand('simulator:tap', {
+            x: args?.x,
+            y: args?.y
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'simulator_launch_app': {
+          const result = await bridge.sendCommand('simulator:launchApp', {
+            bundleId: args?.bundleId
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'simulator_open_url': {
+          const result = await bridge.sendCommand('simulator:openUrl', {
+            url: args?.url
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'simulator_list_devices': {
+          const devices = await bridge.sendCommand('simulator:listDevices');
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify(devices, null, 2)
+            }]
+          };
+        }
+
+        case 'simulator_boot': {
+          const result = await bridge.sendCommand('simulator:boot', {
+            udid: args?.udid,
+            deviceName: args?.deviceName
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'simulator_shutdown': {
+          const result = await bridge.sendCommand('simulator:shutdown');
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'simulator_get_status': {
+          const status = await bridge.sendCommand('simulator:getStatus');
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify(status, null, 2)
+            }]
           };
         }
 

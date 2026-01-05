@@ -989,3 +989,215 @@
   word-break: break-all;
   white-space: pre-wrap;
 }
+
+/* Simulator Toggle Button */
+.simulator-toggle {
+  position: fixed;
+  top: 42px;
+  right: 12px;
+  z-index: 100;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #3c3c3c;
+  border: 1px solid #4c4c4c;
+  border-radius: 6px;
+  color: #cccccc;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.simulator-toggle:hover {
+  background: #4c4c4c;
+  border-color: #5c5c5c;
+}
+
+.simulator-toggle.active {
+  background: #007acc;
+  border-color: #0098ff;
+}
+
+/* Simulator Panel */
+.simulator-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1e1e1e;
+}
+
+.simulator-unavailable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 20px;
+  text-align: center;
+  color: #888888;
+}
+
+.simulator-unavailable .unavailable-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.simulator-unavailable h3 {
+  margin: 0 0 12px 0;
+  color: #cccccc;
+  font-size: 14px;
+}
+
+.simulator-unavailable p {
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+.simulator-unavailable .hint {
+  color: #666666;
+  font-size: 11px;
+}
+
+.simulator-toolbar {
+  height: 35px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  background: #252526;
+  border-bottom: 1px solid #1e1e1e;
+  flex-shrink: 0;
+}
+
+.device-select {
+  flex: 1;
+  height: 24px;
+  padding: 0 8px;
+  background: #3c3c3c;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #cccccc;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.device-select:hover {
+  background: #454545;
+}
+
+.device-select:focus {
+  outline: 1px solid #007acc;
+}
+
+.device-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.boot-btn {
+  color: #23d18b !important;
+}
+
+.shutdown-btn {
+  color: #f14c4c !important;
+}
+
+.simulator-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(241, 76, 76, 0.2);
+  color: #f14c4c;
+  font-size: 11px;
+}
+
+.simulator-error button {
+  background: none;
+  border: none;
+  color: #f14c4c;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.simulator-error button:hover {
+  color: #ff8080;
+}
+
+.simulator-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000000;
+}
+
+.simulator-frame {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.simulator-loading,
+.simulator-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #888888;
+  text-align: center;
+  padding: 20px;
+}
+
+.simulator-loading .loading-spinner {
+  font-size: 32px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.simulator-placeholder .placeholder-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.simulator-placeholder p {
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+.simulator-placeholder .hint {
+  font-size: 11px;
+  color: #666666;
+  margin-top: 8px;
+}
+
+.simulator-status-bar {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  background: #252526;
+  border-top: 1px solid #1e1e1e;
+  font-size: 10px;
+  color: #888888;
+}
+
+.status-device {
+  color: #4ec9b0;
+}
+
+.status-warning {
+  color: #e5e510;
+}

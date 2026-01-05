@@ -4,6 +4,7 @@
  */
 import net from 'net';
 import { BrowserManager } from './browser-manager';
+import { SimulatorManager } from './simulator-manager';
 
 const MCP_BRIDGE_PORT = 9876;
 const MAX_PORT_ATTEMPTS = 10;
@@ -24,10 +25,12 @@ interface MCPResponse {
 export class MCPBridge {
   private server: net.Server | null = null;
   private browser: BrowserManager;
+  private simulator: SimulatorManager | null = null;
   private port: number = MCP_BRIDGE_PORT;
 
-  constructor(browser: BrowserManager) {
+  constructor(browser: BrowserManager, simulator?: SimulatorManager) {
     this.browser = browser;
+    this.simulator = simulator || null;
     this.startServer();
   }
 
@@ -181,6 +184,107 @@ export class MCPBridge {
         case 'reload': {
           this.browser.reload();
           return { id, success: true, data: 'Reloaded' };
+        }
+
+        // Simulator commands
+        case 'simulator:screenshot': {
+          if (!this.simulator) {
+            return { id, success: false, error: 'Simulator not available' };
+          }
+          const data = await this.simulator.screenshot();
+          return { id, success: true, data };
+        }
+
+        case 'simulator:tap': {
+          if (!this.simulator) {
+            return { id, success: false, error: 'Simulator not available' };
+          }
+          const x = args?.x as number;
+          const y = args?.y as number;
+          if (x === undefined || y === undefined) {
+            return { id, success: false, error: 'Missing x or y coordinate' };
+          }
+          await this.simulator.tap(x, y);
+          return { id, success: true, data: `Tapped at (${x}, ${y})` };
+        }
+
+        case 'simulator:launchApp': {
+          if (!this.simulator) {
+            return { id, success: false, error: 'Simulator not available' };
+          }
+          const bundleId = args?.bundleId as string;
+          if (!bundleId) {
+            return { id, success: false, error: 'Missing bundleId' };
+          }
+          await this.simulator.launchApp(bundleId);
+          return { id, success: true, data: `Launched ${bundleId}` };
+        }
+
+        case 'simulator:openUrl': {
+          if (!this.simulator) {
+            return { id, success: false, error: 'Simulator not available' };
+          }
+          const simUrl = args?.url as string;
+          if (!simUrl) {
+            return { id, success: false, error: 'Missing URL' };
+          }
+          await this.simulator.openUrl(simUrl);
+          return { id, success: true, data: `Opened ${simUrl}` };
+        }
+
+        case 'simulator:listDevices': {
+          if (!this.simulator) {
+            return { id, success: false, error: 'Simulator not available' };
+          }
+          const devices = this.simulator.listDevices();
+          return { id, success: true, data: devices };
+        }
+
+        case 'simulator:boot': {
+          if (!this.simulator) {
+            return { id, success: false, error: 'Simulator not available' };
+          }
+          let udid = args?.udid as string;
+          const deviceName = args?.deviceName as string;
+
+          // If deviceName provided, find UDID
+          if (!udid && deviceName) {
+            const devices = this.simulator.listDevices();
+            const device = devices.find(d =>
+              d.name.toLowerCase() === deviceName.toLowerCase()
+            );
+            if (!device) {
+              return { id, success: false, error: `Device not found: ${deviceName}` };
+            }
+            udid = device.udid;
+          }
+
+          if (!udid) {
+            return { id, success: false, error: 'Missing udid or deviceName' };
+          }
+
+          await this.simulator.bootDevice(udid);
+          return { id, success: true, data: `Booted device ${udid}` };
+        }
+
+        case 'simulator:shutdown': {
+          if (!this.simulator) {
+            return { id, success: false, error: 'Simulator not available' };
+          }
+          const booted = this.simulator.getBootedDevice();
+          if (!booted) {
+            return { id, success: false, error: 'No device currently booted' };
+          }
+          await this.simulator.shutdownDevice(booted.udid);
+          return { id, success: true, data: 'Simulator shutdown' };
+        }
+
+        case 'simulator:getStatus': {
+          if (!this.simulator) {
+            return { id, success: true, data: { available: false } };
+          }
+          const status = await this.simulator.getStatus();
+          return { id, success: true, data: status };
         }
 
         default:

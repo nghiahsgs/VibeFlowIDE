@@ -58,12 +58,33 @@ const portsAPI = {
   killPort: (port: number) => ipcRenderer.invoke('ports:kill-port', port) as Promise<boolean>
 };
 
+// Simulator API
+const simulatorAPI = {
+  listDevices: () => ipcRenderer.invoke('simulator:list-devices'),
+  boot: (udid: string) => ipcRenderer.invoke('simulator:boot', udid),
+  shutdown: (udid: string) => ipcRenderer.invoke('simulator:shutdown', udid),
+  screenshot: () => ipcRenderer.invoke('simulator:screenshot') as Promise<string>,
+  getStatus: () => ipcRenderer.invoke('simulator:status'),
+  tap: (x: number, y: number) => ipcRenderer.invoke('simulator:tap', { x, y }),
+  launchApp: (bundleId: string) => ipcRenderer.invoke('simulator:launch-app', bundleId),
+  openUrl: (url: string) => ipcRenderer.invoke('simulator:open-url', url),
+  startStreaming: (frameRate?: number) => ipcRenderer.send('simulator:start-streaming', frameRate),
+  stopStreaming: () => ipcRenderer.send('simulator:stop-streaming'),
+  onFrame: (callback: (base64: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: string) => callback(data);
+    ipcRenderer.on('simulator:frame', handler);
+    return () => ipcRenderer.removeListener('simulator:frame', handler);
+  }
+};
+
 // Expose APIs to renderer
 contextBridge.exposeInMainWorld('terminal', terminalAPI);
 contextBridge.exposeInMainWorld('browser', browserAPI);
 contextBridge.exposeInMainWorld('network', networkAPI);
 contextBridge.exposeInMainWorld('ports', portsAPI);
+contextBridge.exposeInMainWorld('simulator', simulatorAPI);
 
 // Type declarations for renderer
 export type TerminalAPI = typeof terminalAPI;
 export type BrowserAPI = typeof browserAPI;
+export type SimulatorAPI = typeof simulatorAPI;
