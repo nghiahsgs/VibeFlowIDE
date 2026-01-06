@@ -12,8 +12,30 @@ import {
   Tool
 } from '@modelcontextprotocol/sdk/types.js';
 import net from 'net';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
-const MCP_BRIDGE_PORT = 9876;
+const DEFAULT_MCP_BRIDGE_PORT = 9876;
+const PORT_FILE = path.join(os.homedir(), '.vibeflow-mcp-port');
+
+/**
+ * Read MCP Bridge port from file written by VibeFlow IDE
+ * Falls back to default port if file doesn't exist
+ */
+function getMCPBridgePort(): number {
+  try {
+    if (fs.existsSync(PORT_FILE)) {
+      const port = parseInt(fs.readFileSync(PORT_FILE, 'utf-8').trim(), 10);
+      if (!isNaN(port) && port > 0 && port < 65536) {
+        return port;
+      }
+    }
+  } catch (error) {
+    // Ignore errors, use default
+  }
+  return DEFAULT_MCP_BRIDGE_PORT;
+}
 
 // Browser tool definitions
 const browserTools: Tool[] = [
@@ -249,7 +271,9 @@ class ElectronBridge {
 
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.socket = net.createConnection({ port: MCP_BRIDGE_PORT, host: '127.0.0.1' });
+      const port = getMCPBridgePort();
+      console.error(`Connecting to VibeFlow IDE on port ${port}...`);
+      this.socket = net.createConnection({ port, host: '127.0.0.1' });
 
       this.socket.on('connect', () => {
         this.connected = true;

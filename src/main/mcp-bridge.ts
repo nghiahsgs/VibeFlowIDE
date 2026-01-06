@@ -3,11 +3,15 @@
  * Uses simple TCP socket for IPC between MCP server and Electron app
  */
 import net from 'net';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { BrowserManager } from './browser-manager';
 import { SimulatorManager } from './simulator-manager';
 
 const MCP_BRIDGE_PORT = 9876;
 const MAX_PORT_ATTEMPTS = 10;
+const PORT_FILE = path.join(os.homedir(), '.vibeflow-mcp-port');
 
 interface MCPCommand {
   id: string;
@@ -57,6 +61,8 @@ export class MCPBridge {
       this.port = port;
       this.server = server;
       console.log(`MCP Bridge listening on port ${port}`);
+      // Write port to file for MCP server to read
+      this.writePortFile(port);
     });
   }
 
@@ -295,8 +301,28 @@ export class MCPBridge {
     }
   }
 
+  private writePortFile(port: number): void {
+    try {
+      fs.writeFileSync(PORT_FILE, port.toString(), 'utf-8');
+      console.log(`MCP Bridge port written to ${PORT_FILE}`);
+    } catch (error) {
+      console.error('Failed to write port file:', error);
+    }
+  }
+
+  private cleanupPortFile(): void {
+    try {
+      if (fs.existsSync(PORT_FILE)) {
+        fs.unlinkSync(PORT_FILE);
+      }
+    } catch (error) {
+      console.error('Failed to cleanup port file:', error);
+    }
+  }
+
   close(): void {
     this.server?.close();
+    this.cleanupPortFile();
   }
 
   getPort(): number {
