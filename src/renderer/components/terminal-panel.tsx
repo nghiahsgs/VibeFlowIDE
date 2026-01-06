@@ -123,6 +123,17 @@ export function TerminalPanel() {
           window.terminal.write(instance.id, data);
         });
 
+        // Handle Shift+Enter for line continuation (like VS Code Claude extension)
+        instance.terminal.attachCustomKeyEventHandler((event) => {
+          if (event.type === 'keydown' && event.key === 'Enter' && event.shiftKey) {
+            // Send Ctrl+V (literal next) + newline to insert actual newline
+            // \x16 = Ctrl+V, \x0a = LF (newline)
+            window.terminal.write(instance.id, '\x16\x0a');
+            return false; // Prevent default Enter
+          }
+          return true; // Allow other keys
+        });
+
         // Fit terminal and focus
         setTimeout(() => {
           instance.fitAddon.fit();
