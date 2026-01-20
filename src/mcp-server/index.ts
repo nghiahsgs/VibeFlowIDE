@@ -17,23 +17,66 @@ import path from 'path';
 import os from 'os';
 
 const DEFAULT_MCP_BRIDGE_PORT = 9876;
-const PORT_FILE = path.join(os.homedir(), '.vibeflow-mcp-port');
+const INSTANCES_FILE = path.join(os.homedir(), '.vibeflow-instances.json');
+
+interface InstanceInfo {
+  pid: number;
+  port: number;
+  cwd: string;
+  startTime: number;
+}
 
 /**
- * Read MCP Bridge port from file written by VibeFlow IDE
- * Falls back to default port if file doesn't exist
+ * Find the best matching VibeFlow instance for current CWD
+ * Priority: 1) Exact CWD match, 2) CWD is subdirectory, 3) Most recent instance
+ */
+function findBestInstance(): InstanceInfo | null {
+  try {
+    if (!fs.existsSync(INSTANCES_FILE)) {
+      return null;
+    }
+
+    const content = fs.readFileSync(INSTANCES_FILE, 'utf-8');
+    const instances: InstanceInfo[] = JSON.parse(content);
+
+    if (instances.length === 0) {
+      return null;
+    }
+
+    const currentCwd = process.cwd();
+
+    // 1) Exact match
+    const exactMatch = instances.find(i => i.cwd === currentCwd);
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // 2) Current CWD is subdirectory of an instance's CWD
+    const parentMatch = instances
+      .filter(i => currentCwd.startsWith(i.cwd + '/'))
+      .sort((a, b) => b.cwd.length - a.cwd.length)[0]; // Longest match first
+    if (parentMatch) {
+      return parentMatch;
+    }
+
+    // 3) Fall back to most recently started instance
+    return instances.sort((a, b) => b.startTime - a.startTime)[0];
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Get MCP Bridge port from instances registry
+ * Matches by CWD or falls back to most recent instance
  */
 function getMCPBridgePort(): number {
-  try {
-    if (fs.existsSync(PORT_FILE)) {
-      const port = parseInt(fs.readFileSync(PORT_FILE, 'utf-8').trim(), 10);
-      if (!isNaN(port) && port > 0 && port < 65536) {
-        return port;
-      }
-    }
-  } catch (error) {
-    // Ignore errors, use default
+  const instance = findBestInstance();
+  if (instance) {
+    console.error(`Found VibeFlow instance: PID=${instance.pid}, CWD=${instance.cwd}`);
+    return instance.port;
   }
+  console.error('No VibeFlow instance found, using default port');
   return DEFAULT_MCP_BRIDGE_PORT;
 }
 

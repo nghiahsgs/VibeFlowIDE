@@ -11,7 +11,14 @@ import { SimulatorManager } from './simulator-manager';
 
 const MCP_BRIDGE_PORT = 9876;
 const MAX_PORT_ATTEMPTS = 10;
-const PORT_FILE = path.join(os.homedir(), '.vibeflow-mcp-port');
+const INSTANCES_FILE = path.join(os.homedir(), '.vibeflow-instances.json');
+
+interface InstanceInfo {
+  pid: number;
+  port: number;
+  cwd: string;
+  startTime: number;
+}
 
 interface MCPCommand {
   id: string;
@@ -61,8 +68,8 @@ export class MCPBridge {
       this.port = port;
       this.server = server;
       console.log(`MCP Bridge listening on port ${port}`);
-      // Write port to file for MCP server to read
-      this.writePortFile(port);
+      // Register this instance for MCP server discovery
+      this.registerInstance(port);
     });
   }
 
@@ -301,28 +308,87 @@ export class MCPBridge {
     }
   }
 
-  private writePortFile(port: number): void {
+  /**
+   * Register this instance in the shared instances file
+   */
+  private registerInstance(port: number): void {
     try {
-      fs.writeFileSync(PORT_FILE, port.toString(), 'utf-8');
-      console.log(`MCP Bridge port written to ${PORT_FILE}`);
+      const instances = this.readInstances();
+
+      // Remove any stale entries for this PID (shouldn't happen but just in case)
+      const filtered = instances.filter(i => i.pid !== process.pid);
+
+      // Add this instance
+      const newInstance: InstanceInfo = {
+        pid: process.pid,
+        port,
+        cwd: process.cwd(),
+        startTime: Date.now()
+      };
+      filtered.push(newInstance);
+
+      fs.writeFileSync(INSTANCES_FILE, JSON.stringify(filtered, null, 2), 'utf-8');
+      console.log(`MCP Bridge registered: PID=${process.pid}, Port=${port}, CWD=${process.cwd()}`);
     } catch (error) {
-      console.error('Failed to write port file:', error);
+      console.error('Failed to register instance:', error);
     }
   }
 
-  private cleanupPortFile(): void {
+  /**
+   * Remove this instance from the registry
+   */
+  private unregisterInstance(): void {
     try {
-      if (fs.existsSync(PORT_FILE)) {
-        fs.unlinkSync(PORT_FILE);
+      const instances = this.readInstances();
+      const filtered = instances.filter(i => i.pid !== process.pid);
+
+      if (filtered.length > 0) {
+        fs.writeFileSync(INSTANCES_FILE, JSON.stringify(filtered, null, 2), 'utf-8');
+      } else {
+        // No instances left, remove the file
+        if (fs.existsSync(INSTANCES_FILE)) {
+          fs.unlinkSync(INSTANCES_FILE);
+        }
       }
     } catch (error) {
-      console.error('Failed to cleanup port file:', error);
+      console.error('Failed to unregister instance:', error);
+    }
+  }
+
+  /**
+   * Read all registered instances, cleaning up dead ones
+   */
+  private readInstances(): InstanceInfo[] {
+    try {
+      if (!fs.existsSync(INSTANCES_FILE)) {
+        return [];
+      }
+
+      const content = fs.readFileSync(INSTANCES_FILE, 'utf-8');
+      const instances: InstanceInfo[] = JSON.parse(content);
+
+      // Filter out dead processes
+      return instances.filter(instance => this.isProcessAlive(instance.pid));
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
+   * Check if a process is still running
+   */
+  private isProcessAlive(pid: number): boolean {
+    try {
+      process.kill(pid, 0); // Signal 0 just checks if process exists
+      return true;
+    } catch {
+      return false;
     }
   }
 
   close(): void {
     this.server?.close();
-    this.cleanupPortFile();
+    this.unregisterInstance();
   }
 
   getPort(): number {
