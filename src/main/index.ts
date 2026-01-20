@@ -17,6 +17,7 @@ let browserManager: BrowserManager | null = null;
 let mcpBridge: MCPBridge | null = null;
 let portManager: PortManager | null = null;
 let simulatorManager: SimulatorManager | null = null;
+let ipcHandlersRegistered = false;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -47,12 +48,15 @@ function createWindow(): void {
   mcpBridge = new MCPBridge(browserManager, simulatorManager);
   portManager = new PortManager();
 
-  // Setup IPC handlers
-  setupTerminalIPC();
-  setupBrowserIPC();
-  setupNetworkIPC();
-  setupPortsIPC();
-  setupSimulatorIPC();
+  // Setup IPC handlers (only once)
+  if (!ipcHandlersRegistered) {
+    setupTerminalIPC();
+    setupBrowserIPC();
+    setupNetworkIPC();
+    setupPortsIPC();
+    setupSimulatorIPC();
+    ipcHandlersRegistered = true;
+  }
 
   // Load renderer
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
