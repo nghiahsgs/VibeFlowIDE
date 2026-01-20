@@ -2,7 +2,7 @@
  * Browser Manager - Manages embedded browser via WebContentsView
  * Provides navigation controls and exposes webContents for MCP
  */
-import { BrowserWindow, WebContentsView, clipboard } from 'electron';
+import { BrowserWindow, WebContentsView, clipboard, session } from 'electron';
 import { NetworkInterceptor, NetworkRequest } from './network-interceptor';
 
 interface BrowserBounds {
@@ -18,22 +18,37 @@ export class BrowserManager {
   private currentBounds: BrowserBounds = { x: 0, y: 0, width: 0, height: 0 };
   private consoleLogs: string[] = [];
   private networkInterceptor: NetworkInterceptor;
+  private browserSession: Electron.Session;
+
+  // Chrome-like User-Agent to avoid bot detection
+  private static readonly CHROME_USER_AGENT =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
   constructor(parentWindow: BrowserWindow) {
     this.parentWindow = parentWindow;
     this.networkInterceptor = new NetworkInterceptor();
+
+    // Create persistent session to preserve cookies/login state
+    this.browserSession = session.fromPartition('persist:vibeflow-browser', {
+      cache: true
+    });
+
+    // Set Chrome-like User-Agent
+    this.browserSession.setUserAgent(BrowserManager.CHROME_USER_AGENT);
+
     this.create();
   }
 
   /**
-   * Create the WebContentsView
+   * Create the WebContentsView with persistent session
    */
   private create(): void {
     this.view = new WebContentsView({
       webPreferences: {
         sandbox: true,
         contextIsolation: true,
-        nodeIntegration: false
+        nodeIntegration: false,
+        session: this.browserSession  // Use persistent session
       }
     });
 
