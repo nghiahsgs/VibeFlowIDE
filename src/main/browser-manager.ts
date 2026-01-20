@@ -329,6 +329,56 @@ export class BrowserManager {
   }
 
   /**
+   * Wait for element to appear (for modals, dynamic content)
+   */
+  async waitForSelector(selector: string, timeout: number = 5000): Promise<boolean> {
+    if (!this.view) return false;
+    try {
+      const result = await this.view.webContents.executeJavaScript(`
+        (function(selector, timeout) {
+          return new Promise((resolve) => {
+            // Check if already exists
+            if (document.querySelector(selector)) {
+              resolve(true);
+              return;
+            }
+
+            // Use MutationObserver to watch for element
+            const observer = new MutationObserver(() => {
+              if (document.querySelector(selector)) {
+                observer.disconnect();
+                resolve(true);
+              }
+            });
+
+            observer.observe(document.body, {
+              childList: true,
+              subtree: true
+            });
+
+            // Timeout
+            setTimeout(() => {
+              observer.disconnect();
+              resolve(false);
+            }, timeout);
+          });
+        })(${JSON.stringify(selector)}, ${timeout})
+      `);
+      return result === true;
+    } catch (error) {
+      console.error('waitForSelector failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Wait for specified milliseconds
+   */
+  async wait(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
    * Get DOM content
    */
   async getDOM(selector?: string): Promise<string> {

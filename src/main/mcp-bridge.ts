@@ -199,6 +199,22 @@ export class MCPBridge {
           return { id, success: true, data: 'Reloaded' };
         }
 
+        case 'waitForSelector': {
+          const selector = args?.selector as string;
+          const timeout = (args?.timeout as number) || 5000;
+          if (!selector) {
+            return { id, success: false, error: 'Missing selector' };
+          }
+          const found = await this.browser.waitForSelector(selector, timeout);
+          return { id, success: found, data: found ? `Found: ${selector}` : `Timeout waiting for: ${selector}` };
+        }
+
+        case 'wait': {
+          const ms = (args?.ms as number) || 1000;
+          await this.browser.wait(ms);
+          return { id, success: true, data: `Waited ${ms}ms` };
+        }
+
         // Simulator commands
         case 'simulator:screenshot': {
           if (!this.simulator) {

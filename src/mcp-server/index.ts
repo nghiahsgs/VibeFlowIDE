@@ -191,6 +191,38 @@ const browserTools: Tool[] = [
       properties: {},
       required: []
     }
+  },
+  {
+    name: 'browser_wait_for_selector',
+    description: 'Wait for an element to appear (useful for modals, dynamic content). Returns when element is found or timeout.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: {
+          type: 'string',
+          description: 'CSS selector to wait for'
+        },
+        timeout: {
+          type: 'number',
+          description: 'Max wait time in ms (default: 5000)'
+        }
+      },
+      required: ['selector']
+    }
+  },
+  {
+    name: 'browser_wait',
+    description: 'Wait for specified milliseconds before next action',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ms: {
+          type: 'number',
+          description: 'Time to wait in milliseconds (default: 1000)'
+        }
+      },
+      required: []
+    }
   }
 ];
 
@@ -551,6 +583,25 @@ async function main() {
           const url = await bridge.sendCommand('getCurrentURL');
           return {
             content: [{ type: 'text', text: String(url) }]
+          };
+        }
+
+        case 'browser_wait_for_selector': {
+          const result = await bridge.sendCommand('waitForSelector', {
+            selector: args?.selector,
+            timeout: args?.timeout || 5000
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_wait': {
+          const result = await bridge.sendCommand('wait', {
+            ms: args?.ms || 1000
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
           };
         }
 
