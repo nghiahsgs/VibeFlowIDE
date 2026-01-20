@@ -215,6 +215,58 @@ export class MCPBridge {
           return { id, success: true, data: `Waited ${ms}ms` };
         }
 
+        case 'hover': {
+          const selector = args?.selector as string;
+          if (!selector) {
+            return { id, success: false, error: 'Missing selector' };
+          }
+          const hovered = await this.browser.hover(selector);
+          return { id, success: hovered, data: hovered ? `Hovered: ${selector}` : 'Element not found' };
+        }
+
+        case 'scroll': {
+          const scrolled = await this.browser.scroll({
+            selector: args?.selector as string | undefined,
+            x: args?.x as number | undefined,
+            y: args?.y as number | undefined,
+            direction: args?.direction as 'up' | 'down' | 'left' | 'right' | undefined,
+            amount: args?.amount as number | undefined
+          });
+          return { id, success: scrolled, data: scrolled ? 'Scrolled' : 'Scroll failed' };
+        }
+
+        case 'selectOption': {
+          const selector = args?.selector as string;
+          if (!selector) {
+            return { id, success: false, error: 'Missing selector' };
+          }
+          const selected = await this.browser.selectOption(selector, {
+            value: args?.value as string | undefined,
+            label: args?.label as string | undefined,
+            index: args?.index as number | undefined
+          });
+          return { id, success: selected, data: selected ? 'Option selected' : 'Select failed' };
+        }
+
+        case 'pressKey': {
+          const key = args?.key as string;
+          if (!key) {
+            return { id, success: false, error: 'Missing key' };
+          }
+          const pressed = await this.browser.pressKey(key, args?.selector as string | undefined);
+          return { id, success: pressed, data: pressed ? `Pressed: ${key}` : 'Key press failed' };
+        }
+
+        case 'clearConsoleLogs': {
+          await this.browser.clearConsoleLogs();
+          return { id, success: true, data: 'Console logs cleared' };
+        }
+
+        case 'clearNetworkRequests': {
+          this.browser.clearNetworkRequests();
+          return { id, success: true, data: 'Network requests cleared' };
+        }
+
         // Simulator commands
         case 'simulator:screenshot': {
           if (!this.simulator) {

@@ -223,6 +223,139 @@ const browserTools: Tool[] = [
       },
       required: []
     }
+  },
+  {
+    name: 'browser_go_back',
+    description: 'Go back in browser history',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'browser_go_forward',
+    description: 'Go forward in browser history',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'browser_reload',
+    description: 'Reload the current page',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'browser_hover',
+    description: 'Hover over an element by CSS selector',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: {
+          type: 'string',
+          description: 'CSS selector of the element to hover'
+        }
+      },
+      required: ['selector']
+    }
+  },
+  {
+    name: 'browser_scroll',
+    description: 'Scroll the page or to a specific element',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: {
+          type: 'string',
+          description: 'CSS selector to scroll to (optional)'
+        },
+        x: {
+          type: 'number',
+          description: 'X scroll position in pixels (optional)'
+        },
+        y: {
+          type: 'number',
+          description: 'Y scroll position in pixels (optional)'
+        },
+        direction: {
+          type: 'string',
+          description: 'Scroll direction: "up", "down", "left", "right" (optional)'
+        },
+        amount: {
+          type: 'number',
+          description: 'Scroll amount in pixels (default: 300)'
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'browser_select_option',
+    description: 'Select an option from a dropdown/select element',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: {
+          type: 'string',
+          description: 'CSS selector of the select element'
+        },
+        value: {
+          type: 'string',
+          description: 'Value to select'
+        },
+        label: {
+          type: 'string',
+          description: 'Label text to select (alternative to value)'
+        },
+        index: {
+          type: 'number',
+          description: 'Index to select (alternative to value/label)'
+        }
+      },
+      required: ['selector']
+    }
+  },
+  {
+    name: 'browser_press_key',
+    description: 'Press a keyboard key (Enter, Tab, Escape, ArrowDown, etc.)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        key: {
+          type: 'string',
+          description: 'Key to press (e.g., "Enter", "Tab", "Escape", "ArrowDown")'
+        },
+        selector: {
+          type: 'string',
+          description: 'Optional: focus this element before pressing key'
+        }
+      },
+      required: ['key']
+    }
+  },
+  {
+    name: 'browser_clear_console',
+    description: 'Clear the captured console logs',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'browser_clear_network',
+    description: 'Clear the captured network requests',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
   }
 ];
 
@@ -600,6 +733,83 @@ async function main() {
           const result = await bridge.sendCommand('wait', {
             ms: args?.ms || 1000
           });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_go_back': {
+          const result = await bridge.sendCommand('goBack');
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_go_forward': {
+          const result = await bridge.sendCommand('goForward');
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_reload': {
+          const result = await bridge.sendCommand('reload');
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_hover': {
+          const result = await bridge.sendCommand('hover', { selector: args?.selector });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_scroll': {
+          const result = await bridge.sendCommand('scroll', {
+            selector: args?.selector,
+            x: args?.x,
+            y: args?.y,
+            direction: args?.direction,
+            amount: args?.amount
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_select_option': {
+          const result = await bridge.sendCommand('selectOption', {
+            selector: args?.selector,
+            value: args?.value,
+            label: args?.label,
+            index: args?.index
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_press_key': {
+          const result = await bridge.sendCommand('pressKey', {
+            key: args?.key,
+            selector: args?.selector
+          });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_clear_console': {
+          const result = await bridge.sendCommand('clearConsoleLogs');
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_clear_network': {
+          const result = await bridge.sendCommand('clearNetworkRequests');
           return {
             content: [{ type: 'text', text: String(result) }]
           };

@@ -501,6 +501,203 @@ export class BrowserManager {
   }
 
   /**
+   * Hover over element by selector
+   */
+  async hover(selector: string): Promise<boolean> {
+    if (!this.view) return false;
+    try {
+      const result = await this.view.webContents.executeJavaScript(`
+        (function(selector) {
+          const el = document.querySelector(selector);
+          if (!el) return false;
+
+          const event = new MouseEvent('mouseover', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+          });
+          el.dispatchEvent(event);
+
+          const enterEvent = new MouseEvent('mouseenter', {
+            bubbles: false,
+            cancelable: false,
+            view: window
+          });
+          el.dispatchEvent(enterEvent);
+
+          return true;
+        })(${JSON.stringify(selector)})
+      `);
+      return result === true;
+    } catch (error) {
+      console.error('hover failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Scroll page or to element
+   */
+  async scroll(options: {
+    selector?: string;
+    x?: number;
+    y?: number;
+    direction?: 'up' | 'down' | 'left' | 'right';
+    amount?: number;
+  }): Promise<boolean> {
+    if (!this.view) return false;
+    try {
+      const result = await this.view.webContents.executeJavaScript(`
+        (function(options) {
+          const { selector, x, y, direction, amount = 300 } = options;
+
+          // Scroll to element
+          if (selector) {
+            const el = document.querySelector(selector);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              return true;
+            }
+            return false;
+          }
+
+          // Scroll to coordinates
+          if (x !== undefined || y !== undefined) {
+            window.scrollTo({
+              left: x ?? window.scrollX,
+              top: y ?? window.scrollY,
+              behavior: 'smooth'
+            });
+            return true;
+          }
+
+          // Scroll by direction
+          if (direction) {
+            const scrollOptions = { behavior: 'smooth' };
+            switch (direction) {
+              case 'up':
+                window.scrollBy({ ...scrollOptions, top: -amount });
+                break;
+              case 'down':
+                window.scrollBy({ ...scrollOptions, top: amount });
+                break;
+              case 'left':
+                window.scrollBy({ ...scrollOptions, left: -amount });
+                break;
+              case 'right':
+                window.scrollBy({ ...scrollOptions, left: amount });
+                break;
+            }
+            return true;
+          }
+
+          return false;
+        })(${JSON.stringify(options)})
+      `);
+      return result === true;
+    } catch (error) {
+      console.error('scroll failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Select option from dropdown
+   */
+  async selectOption(selector: string, options: {
+    value?: string;
+    label?: string;
+    index?: number;
+  }): Promise<boolean> {
+    if (!this.view) return false;
+    try {
+      const result = await this.view.webContents.executeJavaScript(`
+        (function(selector, options) {
+          const el = document.querySelector(selector);
+          if (!el || el.tagName !== 'SELECT') return false;
+
+          const { value, label, index } = options;
+
+          if (value !== undefined) {
+            el.value = value;
+          } else if (label !== undefined) {
+            const option = Array.from(el.options).find(opt => opt.text === label);
+            if (option) el.value = option.value;
+            else return false;
+          } else if (index !== undefined) {
+            if (index >= 0 && index < el.options.length) {
+              el.selectedIndex = index;
+            } else return false;
+          }
+
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        })(${JSON.stringify(selector)}, ${JSON.stringify(options)})
+      `);
+      return result === true;
+    } catch (error) {
+      console.error('selectOption failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Press keyboard key
+   */
+  async pressKey(key: string, selector?: string): Promise<boolean> {
+    if (!this.view) return false;
+    try {
+      const result = await this.view.webContents.executeJavaScript(`
+        (function(key, selector) {
+          let target = document.activeElement || document.body;
+
+          if (selector) {
+            const el = document.querySelector(selector);
+            if (el) {
+              el.focus();
+              target = el;
+            }
+          }
+
+          const keyMap = {
+            'Enter': { key: 'Enter', code: 'Enter', keyCode: 13 },
+            'Tab': { key: 'Tab', code: 'Tab', keyCode: 9 },
+            'Escape': { key: 'Escape', code: 'Escape', keyCode: 27 },
+            'ArrowUp': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 },
+            'ArrowDown': { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40 },
+            'ArrowLeft': { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
+            'ArrowRight': { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
+            'Backspace': { key: 'Backspace', code: 'Backspace', keyCode: 8 },
+            'Delete': { key: 'Delete', code: 'Delete', keyCode: 46 },
+            'Space': { key: ' ', code: 'Space', keyCode: 32 }
+          };
+
+          const keyInfo = keyMap[key] || { key, code: key, keyCode: key.charCodeAt(0) };
+
+          const eventInit = {
+            key: keyInfo.key,
+            code: keyInfo.code,
+            keyCode: keyInfo.keyCode,
+            which: keyInfo.keyCode,
+            bubbles: true,
+            cancelable: true
+          };
+
+          target.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+          target.dispatchEvent(new KeyboardEvent('keypress', eventInit));
+          target.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+
+          return true;
+        })(${JSON.stringify(key)}, ${JSON.stringify(selector)})
+      `);
+      return result === true;
+    } catch (error) {
+      console.error('pressKey failed:', error);
+      return false;
+    }
+  }
+
+  /**
    * Cleanup resources when app is closing
    */
   destroy(): void {
