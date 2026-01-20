@@ -78,6 +78,11 @@ export class NetworkInterceptor {
    * Handle CDP messages
    */
   private handleDebuggerMessage(method: string, params: Record<string, unknown>): void {
+    // Skip if webContents is destroyed (app closing)
+    if (!this.webContents || this.webContents.isDestroyed()) {
+      return;
+    }
+
     switch (method) {
       case 'Network.requestWillBeSent':
         this.onRequestWillBeSent(params);
@@ -142,7 +147,8 @@ export class NetworkInterceptor {
       request.responseSize = (params.encodedDataLength as number) || 0;
 
       // Fetch response body for text-based responses
-      if (this.webContents && this.debuggerAttached) {
+      // Skip if webContents is destroyed (app closing)
+      if (this.webContents && !this.webContents.isDestroyed() && this.debuggerAttached) {
         try {
           const result = await this.webContents.debugger.sendCommand('Network.getResponseBody', {
             requestId
@@ -186,6 +192,11 @@ export class NetworkInterceptor {
   }
 
   private notifyUpdate(): void {
+    // Skip if webContents is destroyed (app closing)
+    if (!this.webContents || this.webContents.isDestroyed()) {
+      return;
+    }
+
     if (this.onRequestCallback) {
       // Return sorted by start time, newest first, limit to 100
       const requests = Array.from(this.requests.values())
@@ -213,15 +224,18 @@ export class NetworkInterceptor {
   }
 
   /**
-   * Detach debugger
+   * Detach debugger and cleanup
    */
   detach(): void {
-    if (this.debuggerAttached && this.webContents) {
+    if (this.debuggerAttached && this.webContents && !this.webContents.isDestroyed()) {
       try {
         this.webContents.debugger.detach();
       } catch {
-        // Ignore
+        // Ignore - may already be detached
       }
     }
+    this.debuggerAttached = false;
+    this.webContents = null;
+    this.onRequestCallback = null;
   }
 }

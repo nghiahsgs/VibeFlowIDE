@@ -440,4 +440,12 @@ export class BrowserManager {
   clearNetworkRequests(): void {
     this.networkInterceptor.clear();
   }
+
+  /**
+   * Cleanup resources when app is closing
+   */
+  destroy(): void {
+    this.networkInterceptor.detach();
+    this.view = null;
+  }
 }

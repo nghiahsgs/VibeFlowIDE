@@ -64,10 +64,12 @@ function createWindow(): void {
   // DevTools disabled by default - use View menu or Cmd+Option+I to open
 
   mainWindow.on('closed', () => {
+    browserManager?.destroy();
     ptyManager?.killAll();
     simulatorManager?.destroy();
     mcpBridge?.close();
     mainWindow = null;
+    browserManager = null;
   });
 
   // Handle window resize for browser bounds
