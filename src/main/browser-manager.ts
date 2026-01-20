@@ -80,6 +80,15 @@ export class BrowserManager {
       this.parentWindow.webContents.send('browser:navigated', url);
     });
 
+    // Handle popups - open in same view instead of external window
+    this.view.webContents.setWindowOpenHandler(({ url }) => {
+      // Navigate current view to popup URL instead of opening new window
+      if (url && url !== 'about:blank') {
+        this.view?.webContents.loadURL(url);
+      }
+      return { action: 'deny' }; // Prevent external popup
+    });
+
     // Attach network interceptor after page loads
     this.view.webContents.on('did-finish-load', () => {
       this.attachNetworkInterceptor();
