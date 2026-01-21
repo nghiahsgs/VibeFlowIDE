@@ -84,7 +84,7 @@ function getMCPBridgePort(): number {
 const browserTools: Tool[] = [
   {
     name: 'browser_screenshot',
-    description: 'Take a screenshot of the embedded browser in VibeFlow IDE',
+    description: 'Take a screenshot (view only). For clicking/typing, use browser_annotate instead - it shows numbered elements for faster interaction.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -93,7 +93,7 @@ const browserTools: Tool[] = [
   },
   {
     name: 'browser_click',
-    description: 'Click an element in the browser by CSS selector',
+    description: 'Click by CSS selector. PREFER browser_annotate + browser_click_index for faster, more reliable clicks.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -153,7 +153,7 @@ const browserTools: Tool[] = [
   },
   {
     name: 'browser_type_text',
-    description: 'Type text into an input element',
+    description: 'Type by CSS selector. PREFER browser_annotate + browser_type_index for faster input.',
     inputSchema: {
       type: 'object',
       properties: {
