@@ -591,13 +591,13 @@ async function main() {
     try {
       switch (name) {
         case 'browser_screenshot': {
-          const data = await bridge.sendCommand('screenshot');
+          const result = await bridge.sendCommand('screenshot') as { data: string; mimeType: string };
           return {
             content: [
               {
                 type: 'image',
-                data: data as string,
-                mimeType: 'image/png'
+                data: result.data,
+                mimeType: result.mimeType
               }
             ]
           };
@@ -823,7 +823,7 @@ async function main() {
               {
                 type: 'image',
                 data: data as string,
-                mimeType: 'image/png'
+                mimeType: 'image/jpeg'
               }
             ]
           };
