@@ -148,6 +148,35 @@ export class PtyManager {
   }
 
   /**
+   * Get all active terminal IDs
+   */
+  getActiveIds(): string[] {
+    return Array.from(this.instances.keys());
+  }
+
+  /**
+   * Check if a terminal is still alive
+   */
+  isAlive(id: string): boolean {
+    const instance = this.instances.get(id);
+    if (!instance) return false;
+
+    try {
+      // Try to get process info - if it throws, process is dead
+      const pid = instance.process.pid;
+      if (pid <= 0) return false;
+
+      // On macOS/Linux, check if process exists
+      process.kill(pid, 0); // Signal 0 just checks existence
+      return true;
+    } catch {
+      // Process doesn't exist or we can't signal it
+      this.instances.delete(id);
+      return false;
+    }
+  }
+
+  /**
    * Get current working directory of a terminal
    * Uses lsof on macOS/Linux to get the actual cwd
    */

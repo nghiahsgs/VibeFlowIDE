@@ -2,7 +2,7 @@
  * Electron Main Process
  * Manages app lifecycle, creates windows, and handles IPC
  */
-import { app, BrowserWindow, ipcMain, WebContentsView } from 'electron';
+import { app, BrowserWindow, ipcMain, WebContentsView, powerMonitor } from 'electron';
 import { join } from 'path';
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';
 import { PtyManager } from './pty-manager';
@@ -18,6 +18,13 @@ let mcpBridge: MCPBridge | null = null;
 let portManager: PortManager | null = null;
 let simulatorManager: SimulatorManager | null = null;
 let ipcHandlersRegistered = false;
+
+// Saved terminal sessions for restore after sleep/resume
+interface SavedTerminalSession {
+  id: string;
+  cwd: string;
+}
+let savedTerminalSessions: SavedTerminalSession[] = [];
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -217,6 +224,38 @@ function setupSimulatorIPC(): void {
   });
 }
 
+// Save terminal sessions (CWD) before system sleep
+async function saveTerminalSessions(): Promise<void> {
+  if (!ptyManager) return;
+
+  const sessions: SavedTerminalSession[] = [];
+  // Get all active terminal IDs from ptyManager
+  const activeIds = ptyManager.getActiveIds();
+
+  for (const id of activeIds) {
+    const cwd = await ptyManager.getCwd(id);
+    sessions.push({ id, cwd });
+    console.log(`[Session] Saved terminal ${id} with cwd: ${cwd}`);
+  }
+
+  savedTerminalSessions = sessions;
+}
+
+// Check and restore dead terminals after system resume
+function restoreTerminalSessions(): void {
+  if (!ptyManager || !mainWindow) return;
+
+  for (const session of savedTerminalSessions) {
+    // Check if terminal is still alive
+    if (!ptyManager.isAlive(session.id)) {
+      console.log(`[Session] Restoring terminal ${session.id} at: ${session.cwd}`);
+      ptyManager.create(session.id, (data) => {
+        mainWindow?.webContents.send('terminal:data', { id: session.id, data });
+      }, session.cwd);
+    }
+  }
+}
+
 // App lifecycle
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.vibeflow.ide');
@@ -227,6 +266,20 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+
+  // Setup power monitor for sleep/resume
+  powerMonitor.on('suspend', async () => {
+    console.log('[Power] System suspending, saving terminal sessions...');
+    await saveTerminalSessions();
+  });
+
+  powerMonitor.on('resume', () => {
+    console.log('[Power] System resumed, checking terminals...');
+    // Delay restore to let system fully wake up
+    setTimeout(() => {
+      restoreTerminalSessions();
+    }, 1000);
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
