@@ -267,6 +267,36 @@ export class MCPBridge {
           return { id, success: true, data: 'Network requests cleared' };
         }
 
+        // Annotated screenshot & index-based interactions
+        case 'annotate': {
+          const result = await this.browser.annotateScreenshot();
+          return { id, success: true, data: result };
+        }
+
+        case 'clickIndex': {
+          const index = args?.index as number;
+          if (typeof index !== 'number') {
+            return { id, success: false, error: 'Missing index' };
+          }
+          const clicked = await this.browser.clickByIndex(index);
+          return { id, success: clicked, data: clicked ? `Clicked element [${index}]` : `Element [${index}] not found` };
+        }
+
+        case 'typeIndex': {
+          const index = args?.index as number;
+          const text = args?.text as string;
+          if (typeof index !== 'number' || text === undefined) {
+            return { id, success: false, error: 'Missing index or text' };
+          }
+          const typed = await this.browser.typeByIndex(index, text);
+          return { id, success: typed, data: typed ? `Typed into element [${index}]` : `Element [${index}] not found` };
+        }
+
+        case 'getAnnotatedElements': {
+          const elements = this.browser.getAnnotatedElements();
+          return { id, success: true, data: elements };
+        }
+
         // Simulator commands
         case 'simulator:screenshot': {
           if (!this.simulator) {

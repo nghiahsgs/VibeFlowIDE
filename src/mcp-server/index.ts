@@ -356,6 +356,47 @@ const browserTools: Tool[] = [
       properties: {},
       required: []
     }
+  },
+  {
+    name: 'browser_annotate',
+    description: 'Take screenshot with numbered badges on interactive elements. Returns image + element list. Use browser_click_index/browser_type_index to interact by number.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'browser_click_index',
+    description: 'Click element by index number from browser_annotate. Faster than CSS selector.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        index: {
+          type: 'number',
+          description: 'Element index from browser_annotate (1-based)'
+        }
+      },
+      required: ['index']
+    }
+  },
+  {
+    name: 'browser_type_index',
+    description: 'Type text into element by index number from browser_annotate. Faster than CSS selector.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        index: {
+          type: 'number',
+          description: 'Element index from browser_annotate (1-based)'
+        },
+        text: {
+          type: 'string',
+          description: 'Text to type'
+        }
+      },
+      required: ['index', 'text']
+    }
   }
 ];
 
@@ -810,6 +851,57 @@ async function main() {
 
         case 'browser_clear_network': {
           const result = await bridge.sendCommand('clearNetworkRequests');
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_annotate': {
+          const result = await bridge.sendCommand('annotate') as {
+            data: string;
+            mimeType: string;
+            elements: Array<{
+              index: number;
+              tag: string;
+              type?: string;
+              text: string;
+              selector: string;
+              rect: { x: number; y: number; width: number; height: number };
+            }>;
+          };
+
+          // Format elements list for text output
+          const elementsList = result.elements
+            .map(el => `[${el.index}] <${el.tag}${el.type ? ` type="${el.type}"` : ''}> "${el.text}"`)
+            .join('\n');
+
+          return {
+            content: [
+              {
+                type: 'image',
+                data: result.data,
+                mimeType: result.mimeType
+              },
+              {
+                type: 'text',
+                text: `Found ${result.elements.length} interactive elements:\n${elementsList}`
+              }
+            ]
+          };
+        }
+
+        case 'browser_click_index': {
+          const index = args?.index as number;
+          const result = await bridge.sendCommand('clickIndex', { index });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_type_index': {
+          const index = args?.index as number;
+          const text = args?.text as string;
+          const result = await bridge.sendCommand('typeIndex', { index, text });
           return {
             content: [{ type: 'text', text: String(result) }]
           };

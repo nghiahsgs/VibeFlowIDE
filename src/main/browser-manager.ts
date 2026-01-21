@@ -12,6 +12,16 @@ interface BrowserBounds {
   height: number;
 }
 
+/** Cached element info from annotation */
+interface AnnotatedElement {
+  index: number;
+  tag: string;
+  type?: string;  // for inputs
+  text: string;
+  selector: string;
+  rect: { x: number; y: number; width: number; height: number };
+}
+
 export class BrowserManager {
   private view: WebContentsView | null = null;
   private parentWindow: BrowserWindow;
@@ -19,6 +29,9 @@ export class BrowserManager {
   private consoleLogs: string[] = [];
   private networkInterceptor: NetworkInterceptor;
   private browserSession: Electron.Session;
+
+  // Cached annotated elements from last annotateScreenshot() call
+  private annotatedElements: AnnotatedElement[] = [];
 
   // Chrome-like User-Agent to avoid bot detection
   private static readonly CHROME_USER_AGENT =
@@ -321,6 +334,231 @@ export class BrowserManager {
       data: jpegBuffer.toString('base64'),
       mimeType: 'image/jpeg'
     };
+  }
+
+  /**
+   * Take screenshot with numbered badges on interactive elements.
+   * Caches element mapping for subsequent clickByIndex/typeByIndex calls.
+   */
+  async annotateScreenshot(): Promise<{
+    data: string;
+    mimeType: string;
+    elements: AnnotatedElement[];
+  }> {
+    if (!this.view) return { data: '', mimeType: 'image/jpeg', elements: [] };
+
+    // Inject badges and collect element info
+    const elements = await this.view.webContents.executeJavaScript(`
+      (function() {
+        // Remove any existing badges first
+        document.querySelectorAll('[data-vibeflow-badge]').forEach(el => el.remove());
+
+        // Find all interactive elements
+        const selectors = 'a, button, input, textarea, select, [role="button"], [onclick], [tabindex="0"]';
+        const allElements = Array.from(document.querySelectorAll(selectors));
+
+        // Filter visible elements only
+        const visibleElements = allElements.filter(el => {
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
+          return rect.width > 0 && rect.height > 0 &&
+                 style.display !== 'none' &&
+                 style.visibility !== 'hidden' &&
+                 style.opacity !== '0' &&
+                 rect.top < window.innerHeight &&
+                 rect.bottom > 0 &&
+                 rect.left < window.innerWidth &&
+                 rect.right > 0;
+        });
+
+        // Limit to first 50 elements for performance
+        const elements = visibleElements.slice(0, 50);
+        const result = [];
+
+        elements.forEach((el, idx) => {
+          const rect = el.getBoundingClientRect();
+          const index = idx + 1;
+
+          // Create badge
+          const badge = document.createElement('div');
+          badge.setAttribute('data-vibeflow-badge', index.toString());
+          badge.style.cssText = \`
+            position: fixed;
+            left: \${rect.left - 2}px;
+            top: \${rect.top - 2}px;
+            background: #ff6b35;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 1px 4px;
+            border-radius: 3px;
+            z-index: 999999;
+            pointer-events: none;
+            font-family: monospace;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+          \`;
+          badge.textContent = index.toString();
+          document.body.appendChild(badge);
+
+          // Generate unique selector
+          let selector = '';
+          if (el.id) {
+            selector = '#' + el.id;
+          } else {
+            // Build a path selector
+            const tag = el.tagName.toLowerCase();
+            const classes = Array.from(el.classList).slice(0, 2).join('.');
+            selector = classes ? tag + '.' + classes : tag;
+            const parent = el.parentElement;
+            if (parent) {
+              const siblings = Array.from(parent.children).filter(c =>
+                c.tagName === el.tagName
+              );
+              if (siblings.length > 1) {
+                const idx = siblings.indexOf(el) + 1;
+                selector += ':nth-of-type(' + idx + ')';
+              }
+            }
+          }
+
+          // Get text content
+          let text = el.textContent?.trim().substring(0, 50) || '';
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            text = el.placeholder || el.value || '';
+          }
+
+          result.push({
+            index,
+            tag: el.tagName.toLowerCase(),
+            type: el.type || undefined,
+            text,
+            selector,
+            rect: {
+              x: Math.round(rect.left),
+              y: Math.round(rect.top),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height)
+            }
+          });
+        });
+
+        return result;
+      })()
+    `);
+
+    // Cache elements for later use
+    this.annotatedElements = elements;
+
+    // Take screenshot with badges
+    let image = await this.view.webContents.capturePage();
+
+    // Remove badges after screenshot
+    await this.view.webContents.executeJavaScript(`
+      document.querySelectorAll('[data-vibeflow-badge]').forEach(el => el.remove());
+    `);
+
+    // Resize for API limits
+    const MAX_SIZE = 1280;
+    const size = image.getSize();
+    if (size.width > MAX_SIZE || size.height > MAX_SIZE) {
+      const scale = Math.min(MAX_SIZE / size.width, MAX_SIZE / size.height);
+      const newWidth = Math.floor(size.width * scale);
+      const newHeight = Math.floor(size.height * scale);
+      image = image.resize({ width: newWidth, height: newHeight, quality: 'good' });
+    }
+
+    clipboard.writeImage(image);
+    const jpegBuffer = image.toJPEG(80);
+
+    return {
+      data: jpegBuffer.toString('base64'),
+      mimeType: 'image/jpeg',
+      elements
+    };
+  }
+
+  /**
+   * Click element by index (from annotateScreenshot)
+   */
+  async clickByIndex(index: number): Promise<boolean> {
+    const element = this.annotatedElements.find(el => el.index === index);
+    if (!element) {
+      console.error(`Element index ${index} not found in cache`);
+      return false;
+    }
+
+    // Click using center coordinates (more reliable than selector)
+    const centerX = element.rect.x + element.rect.width / 2;
+    const centerY = element.rect.y + element.rect.height / 2;
+
+    if (!this.view) return false;
+
+    try {
+      await this.view.webContents.executeJavaScript(`
+        (function() {
+          const el = document.elementFromPoint(${centerX}, ${centerY});
+          if (el) {
+            el.click();
+            return true;
+          }
+          return false;
+        })()
+      `);
+      return true;
+    } catch (error) {
+      console.error('clickByIndex failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Type text into element by index (from annotateScreenshot)
+   */
+  async typeByIndex(index: number, text: string): Promise<boolean> {
+    const element = this.annotatedElements.find(el => el.index === index);
+    if (!element) {
+      console.error(`Element index ${index} not found in cache`);
+      return false;
+    }
+
+    if (!this.view) return false;
+
+    try {
+      const result = await this.view.webContents.executeJavaScript(`
+        (function(x, y, text) {
+          const el = document.elementFromPoint(x, y);
+          if (!el) return false;
+
+          el.focus();
+
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype,
+            'value'
+          )?.set;
+
+          if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(el, text);
+          } else {
+            el.value = text;
+          }
+
+          el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+          return true;
+        })(${element.rect.x + element.rect.width / 2}, ${element.rect.y + element.rect.height / 2}, ${JSON.stringify(text)})
+      `);
+      return result === true;
+    } catch (error) {
+      console.error('typeByIndex failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get cached annotated elements
+   */
+  getAnnotatedElements(): AnnotatedElement[] {
+    return this.annotatedElements;
   }
 
   /**
