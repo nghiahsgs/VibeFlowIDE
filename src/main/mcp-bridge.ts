@@ -297,6 +297,26 @@ export class MCPBridge {
           return { id, success: true, data: elements };
         }
 
+        // Device emulation commands
+        case 'setDeviceMode': {
+          const deviceId = args?.deviceId as string;
+          if (!deviceId) {
+            return { id, success: false, error: 'Missing deviceId' };
+          }
+          const success = await this.browser.setDeviceMode(deviceId);
+          return { id, success, data: success ? `Device mode set to: ${deviceId}` : `Unknown device: ${deviceId}` };
+        }
+
+        case 'getDeviceMode': {
+          const mode = this.browser.getDeviceMode();
+          return { id, success: true, data: mode };
+        }
+
+        case 'getDevicePresets': {
+          const presets = this.browser.getDevicePresets();
+          return { id, success: true, data: presets };
+        }
+
         // Simulator commands
         case 'simulator:screenshot': {
           if (!this.simulator) {

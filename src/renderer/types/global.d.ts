@@ -12,6 +12,19 @@ interface TerminalAPI {
   onData: (callback: (payload: { id: string; data: string }) => void) => () => void;
 }
 
+interface DeviceChangedInfo {
+  deviceId: string;
+  name: string;
+  mobile: boolean;
+  width?: number;
+  height?: number;
+}
+
+interface DevicePreset {
+  id: string;
+  name: string;
+}
+
 interface BrowserAPI {
   navigate: (url: string) => void;
   back: () => void;
@@ -24,6 +37,11 @@ interface BrowserAPI {
   getConsoleLogs: () => Promise<string[]>;
   clearConsoleLogs: () => void;
   screenshot: () => Promise<string>;
+  // Device emulation
+  setDeviceMode: (deviceId: string) => Promise<boolean>;
+  getDeviceMode: () => Promise<string>;
+  getDevicePresets: () => Promise<DevicePreset[]>;
+  onDeviceChanged: (callback: (info: DeviceChangedInfo) => void) => () => void;
 }
 
 export interface NetworkRequest {

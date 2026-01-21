@@ -397,6 +397,38 @@ const browserTools: Tool[] = [
       },
       required: ['index', 'text']
     }
+  },
+  {
+    name: 'browser_set_device_mode',
+    description: 'Set browser device emulation mode (mobile/tablet/desktop). Changes viewport, user-agent, and enables touch for mobile devices. Screenshots will reflect the device viewport.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deviceId: {
+          type: 'string',
+          description: 'Device ID: "desktop", "iphone-15-pro", "iphone-se", "ipad-pro", "pixel-7", "galaxy-s23"'
+        }
+      },
+      required: ['deviceId']
+    }
+  },
+  {
+    name: 'browser_get_device_mode',
+    description: 'Get current browser device emulation mode',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'browser_get_device_presets',
+    description: 'Get list of available device presets for browser emulation',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
   }
 ];
 
@@ -904,6 +936,29 @@ async function main() {
           const result = await bridge.sendCommand('typeIndex', { index, text });
           return {
             content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_set_device_mode': {
+          const deviceId = args?.deviceId as string;
+          const result = await bridge.sendCommand('setDeviceMode', { deviceId });
+          return {
+            content: [{ type: 'text', text: String(result) }]
+          };
+        }
+
+        case 'browser_get_device_mode': {
+          const mode = await bridge.sendCommand('getDeviceMode');
+          return {
+            content: [{ type: 'text', text: String(mode) }]
+          };
+        }
+
+        case 'browser_get_device_presets': {
+          const presets = await bridge.sendCommand('getDevicePresets') as Array<{ id: string; name: string }>;
+          const formatted = presets.map(p => `- ${p.id}: ${p.name}`).join('\n');
+          return {
+            content: [{ type: 'text', text: `Available devices:\n${formatted}` }]
           };
         }
 

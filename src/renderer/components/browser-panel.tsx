@@ -4,10 +4,17 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+interface DevicePreset {
+  id: string;
+  name: string;
+}
+
 export function BrowserPanel() {
   const [url, setUrl] = useState('https://www.google.com');
   const [inputUrl, setInputUrl] = useState('https://www.google.com');
   const [screenshotStatus, setScreenshotStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [deviceMode, setDeviceMode] = useState('desktop');
+  const [devicePresets, setDevicePresets] = useState<DevicePreset[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Update browser bounds when container resizes
@@ -33,6 +40,15 @@ export function BrowserPanel() {
       setInputUrl(newUrl);
     });
 
+    // Listen for device mode changes
+    const unsubscribeDevice = window.browser.onDeviceChanged((info) => {
+      setDeviceMode(info.deviceId);
+    });
+
+    // Load device presets and current mode
+    window.browser.getDevicePresets().then(setDevicePresets);
+    window.browser.getDeviceMode().then(setDeviceMode);
+
     // Observe container resize
     const resizeObserver = new ResizeObserver(updateBounds);
     if (containerRef.current) {
@@ -42,6 +58,7 @@ export function BrowserPanel() {
     return () => {
       clearTimeout(timeout);
       unsubscribe();
+      unsubscribeDevice();
       resizeObserver.disconnect();
     };
   }, [updateBounds]);
@@ -55,6 +72,11 @@ export function BrowserPanel() {
     if (e.key === 'Escape') {
       setInputUrl(url);
     }
+  };
+
+  const handleDeviceChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newDevice = e.target.value;
+    await window.browser.setDeviceMode(newDevice);
   };
 
   return (
@@ -80,6 +102,19 @@ export function BrowserPanel() {
             className="url-input"
           />
         </form>
+
+        <select
+          value={deviceMode}
+          onChange={handleDeviceChange}
+          className="device-select"
+          title="Device Mode"
+        >
+          {devicePresets.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
 
         <button
           onClick={async () => {

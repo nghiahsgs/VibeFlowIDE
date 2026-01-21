@@ -12,6 +12,67 @@ interface BrowserBounds {
   height: number;
 }
 
+/** Device emulation presets */
+export interface DevicePreset {
+  name: string;
+  width: number;
+  height: number;
+  deviceScaleFactor: number;
+  userAgent: string;
+  mobile: boolean;
+}
+
+export const DEVICE_PRESETS: Record<string, DevicePreset> = {
+  desktop: {
+    name: 'Desktop',
+    width: 0, // 0 means use container width
+    height: 0,
+    deviceScaleFactor: 1,
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    mobile: false
+  },
+  'iphone-15-pro': {
+    name: 'iPhone 15 Pro',
+    width: 393,
+    height: 852,
+    deviceScaleFactor: 3,
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    mobile: true
+  },
+  'iphone-se': {
+    name: 'iPhone SE',
+    width: 375,
+    height: 667,
+    deviceScaleFactor: 2,
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    mobile: true
+  },
+  'ipad-pro': {
+    name: 'iPad Pro 12.9"',
+    width: 1024,
+    height: 1366,
+    deviceScaleFactor: 2,
+    userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    mobile: true
+  },
+  'pixel-7': {
+    name: 'Pixel 7',
+    width: 412,
+    height: 915,
+    deviceScaleFactor: 2.625,
+    userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+    mobile: true
+  },
+  'galaxy-s23': {
+    name: 'Galaxy S23',
+    width: 360,
+    height: 780,
+    deviceScaleFactor: 3,
+    userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+    mobile: true
+  }
+};
+
 /** Cached element info from annotation */
 interface AnnotatedElement {
   index: number;
@@ -32,6 +93,9 @@ export class BrowserManager {
 
   // Cached annotated elements from last annotateScreenshot() call
   private annotatedElements: AnnotatedElement[] = [];
+
+  // Current device emulation mode
+  private currentDevice: string = 'desktop';
 
   // Chrome-like User-Agent to avoid bot detection
   private static readonly CHROME_USER_AGENT =
@@ -209,6 +273,119 @@ export class BrowserManager {
   updateBounds(): void {
     if (this.currentBounds.width > 0) {
       this.view?.setBounds(this.currentBounds);
+    }
+  }
+
+  /**
+   * Get current device mode
+   */
+  getDeviceMode(): string {
+    return this.currentDevice;
+  }
+
+  /**
+   * Get list of available device presets
+   */
+  getDevicePresets(): { id: string; name: string }[] {
+    return Object.entries(DEVICE_PRESETS).map(([id, preset]) => ({
+      id,
+      name: preset.name
+    }));
+  }
+
+  /**
+   * Set device emulation mode (mobile/tablet/desktop)
+   * Changes viewport, user-agent, and touch emulation
+   */
+  async setDeviceMode(deviceId: string): Promise<boolean> {
+    if (!this.view) return false;
+
+    const preset = DEVICE_PRESETS[deviceId];
+    if (!preset) {
+      console.error(`Unknown device: ${deviceId}`);
+      return false;
+    }
+
+    this.currentDevice = deviceId;
+    const webContents = this.view.webContents;
+
+    try {
+      // For desktop mode, disable emulation
+      if (deviceId === 'desktop') {
+        await webContents.debugger.attach('1.3');
+        await webContents.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
+        await webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled', {
+          enabled: false
+        });
+        await webContents.debugger.sendCommand('Emulation.setUserAgentOverride', {
+          userAgent: BrowserManager.CHROME_USER_AGENT
+        });
+        webContents.debugger.detach();
+
+        // Reset session user agent
+        this.browserSession.setUserAgent(BrowserManager.CHROME_USER_AGENT);
+
+        // Notify renderer about device change
+        this.parentWindow.webContents.send('browser:device-changed', {
+          deviceId,
+          name: preset.name,
+          mobile: false
+        });
+
+        return true;
+      }
+
+      // For mobile/tablet modes, enable emulation
+      await webContents.debugger.attach('1.3');
+
+      // Set device metrics (viewport size, scale)
+      await webContents.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+        width: preset.width,
+        height: preset.height,
+        deviceScaleFactor: preset.deviceScaleFactor,
+        mobile: preset.mobile,
+        screenWidth: preset.width,
+        screenHeight: preset.height
+      });
+
+      // Enable touch emulation for mobile devices
+      await webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled', {
+        enabled: preset.mobile,
+        maxTouchPoints: preset.mobile ? 5 : 0
+      });
+
+      // Set mobile user agent
+      await webContents.debugger.sendCommand('Emulation.setUserAgentOverride', {
+        userAgent: preset.userAgent,
+        platform: preset.mobile ? (preset.userAgent.includes('iPhone') || preset.userAgent.includes('iPad') ? 'iPhone' : 'Linux armv81') : 'MacIntel'
+      });
+
+      webContents.debugger.detach();
+
+      // Update session user agent for new requests
+      this.browserSession.setUserAgent(preset.userAgent);
+
+      // Notify renderer about device change
+      this.parentWindow.webContents.send('browser:device-changed', {
+        deviceId,
+        name: preset.name,
+        mobile: preset.mobile,
+        width: preset.width,
+        height: preset.height
+      });
+
+      // Reload page to apply changes
+      webContents.reload();
+
+      return true;
+    } catch (error) {
+      console.error('setDeviceMode failed:', error);
+      try {
+        webContents.debugger.detach();
+      } catch {
+        // Ignore detach errors
+      }
+      return false;
     }
   }
 

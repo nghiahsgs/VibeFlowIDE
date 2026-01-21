@@ -148,6 +148,18 @@ function setupBrowserIPC(): void {
   ipcMain.handle('browser:screenshot', async () => {
     return browserManager?.screenshot() || '';
   });
+
+  ipcMain.handle('browser:set-device-mode', async (_, deviceId: string) => {
+    return browserManager?.setDeviceMode(deviceId) || false;
+  });
+
+  ipcMain.handle('browser:get-device-mode', () => {
+    return browserManager?.getDeviceMode() || 'desktop';
+  });
+
+  ipcMain.handle('browser:get-device-presets', () => {
+    return browserManager?.getDevicePresets() || [];
+  });
 }
 
 // Network IPC handlers

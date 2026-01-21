@@ -1072,8 +1072,8 @@
   flex-shrink: 0;
 }
 
+/* Device Select (shared between browser and simulator) */
 .device-select {
-  flex: 1;
   height: 24px;
   padding: 0 8px;
   background: #3c3c3c;
@@ -1095,6 +1095,17 @@
 .device-select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Browser-specific device select (narrower) */
+.browser-toolbar .device-select {
+  width: 120px;
+  flex: none;
+}
+
+/* Simulator toolbar device select (full width) */
+.simulator-toolbar .device-select {
+  flex: 1;
 }
 
 .boot-btn {

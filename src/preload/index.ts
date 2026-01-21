@@ -37,7 +37,16 @@ const browserAPI = {
   },
   getConsoleLogs: () => ipcRenderer.invoke('browser:console-logs') as Promise<string[]>,
   clearConsoleLogs: () => ipcRenderer.send('browser:clear-console'),
-  screenshot: () => ipcRenderer.invoke('browser:screenshot') as Promise<string>
+  screenshot: () => ipcRenderer.invoke('browser:screenshot') as Promise<string>,
+  // Device emulation
+  setDeviceMode: (deviceId: string) => ipcRenderer.invoke('browser:set-device-mode', deviceId) as Promise<boolean>,
+  getDeviceMode: () => ipcRenderer.invoke('browser:get-device-mode') as Promise<string>,
+  getDevicePresets: () => ipcRenderer.invoke('browser:get-device-presets') as Promise<{ id: string; name: string }[]>,
+  onDeviceChanged: (callback: (info: { deviceId: string; name: string; mobile: boolean; width?: number; height?: number }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, info: { deviceId: string; name: string; mobile: boolean; width?: number; height?: number }) => callback(info);
+    ipcRenderer.on('browser:device-changed', handler);
+    return () => ipcRenderer.removeListener('browser:device-changed', handler);
+  }
 };
 
 // Network API
