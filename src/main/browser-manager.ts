@@ -325,15 +325,21 @@ export class BrowserManager {
       image = image.resize({ width: newWidth, height: newHeight, quality: 'good' });
     }
 
-    // Copy to clipboard using Electron's clipboard API
-    clipboard.writeImage(image);
-
     // Return as JPEG (much smaller than PNG) with 80% quality
     const jpegBuffer = image.toJPEG(80);
     return {
       data: jpegBuffer.toString('base64'),
       mimeType: 'image/jpeg'
     };
+  }
+
+  /**
+   * Copy current page screenshot to clipboard (for manual use, not MCP)
+   */
+  async copyScreenshotToClipboard(): Promise<void> {
+    if (!this.view) return;
+    const image = await this.view.webContents.capturePage();
+    clipboard.writeImage(image);
   }
 
   /**
@@ -467,7 +473,6 @@ export class BrowserManager {
       image = image.resize({ width: newWidth, height: newHeight, quality: 'good' });
     }
 
-    clipboard.writeImage(image);
     const jpegBuffer = image.toJPEG(80);
 
     return {
