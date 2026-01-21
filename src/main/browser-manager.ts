@@ -296,10 +296,22 @@ export class BrowserManager {
 
   /**
    * Take screenshot, copy to clipboard, and return base64
+   * Resizes to max 1920px to avoid Claude API size limits
    */
   async screenshot(): Promise<string> {
     if (!this.view) return '';
-    const image = await this.view.webContents.capturePage();
+    let image = await this.view.webContents.capturePage();
+
+    // Resize if larger than 1920px (Claude API limit is 2000px for multi-image)
+    const MAX_SIZE = 1920;
+    const size = image.getSize();
+    if (size.width > MAX_SIZE || size.height > MAX_SIZE) {
+      const scale = Math.min(MAX_SIZE / size.width, MAX_SIZE / size.height);
+      const newWidth = Math.floor(size.width * scale);
+      const newHeight = Math.floor(size.height * scale);
+      image = image.resize({ width: newWidth, height: newHeight, quality: 'best' });
+    }
+
     // Copy to clipboard using Electron's clipboard API
     clipboard.writeImage(image);
     return image.toDataURL().split(',')[1]; // Return base64 without prefix
