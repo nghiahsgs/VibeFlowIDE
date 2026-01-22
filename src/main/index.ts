@@ -35,11 +35,15 @@ function createWindow(): void {
     show: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 12, y: 12 },
+    // Prevent window from stealing focus during background operations
+    focusable: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false, // Required for node-pty IPC
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // Prevent background pages from activating the window
+      backgroundThrottling: false
     }
   });
 

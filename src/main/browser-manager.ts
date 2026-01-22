@@ -129,6 +129,9 @@ export class BrowserManager {
       }
     });
 
+    // Increase max listeners to prevent warnings during normal operation
+    this.view.webContents.setMaxListeners(20);
+
     // Add to parent window
     this.parentWindow.contentView.addChildView(this.view);
 
@@ -144,9 +147,12 @@ export class BrowserManager {
     });
 
     // Inject console override to serialize objects as JSON
-    this.view.webContents.on('did-finish-load', () => {
+    // Use arrow function to maintain 'this' context
+    const handleDidFinishLoad = () => {
       this.injectConsoleOverride();
-    });
+      this.attachNetworkInterceptor();
+    };
+    this.view.webContents.on('did-finish-load', handleDidFinishLoad);
 
     // Handle navigation events
     this.view.webContents.on('did-navigate', (_, url) => {
@@ -166,11 +172,6 @@ export class BrowserManager {
       return { action: 'deny' }; // Prevent external popup
     });
 
-    // Attach network interceptor after page loads
-    this.view.webContents.on('did-finish-load', () => {
-      this.attachNetworkInterceptor();
-    });
-
     // Setup network update callback
     this.networkInterceptor.onUpdate((requests) => {
       this.parentWindow.webContents.send('network:update', requests);
@@ -184,7 +185,7 @@ export class BrowserManager {
    * Inject console override to properly serialize objects
    */
   private async injectConsoleOverride(): Promise<void> {
-    if (!this.view) return;
+    if (!this.view || this.view.webContents.isDestroyed()) return;
 
     try {
       await this.view.webContents.executeJavaScript(`
@@ -252,10 +253,15 @@ export class BrowserManager {
 
   /**
    * Attach network interceptor to webContents
+   * Safely handles errors to prevent crashes
    */
   private async attachNetworkInterceptor(): Promise<void> {
-    if (this.view) {
-      await this.networkInterceptor.attach(this.view.webContents);
+    if (this.view && !this.view.webContents.isDestroyed()) {
+      try {
+        await this.networkInterceptor.attach(this.view.webContents);
+      } catch (error) {
+        console.error('Failed to attach network interceptor:', error);
+      }
     }
   }
 
@@ -298,7 +304,7 @@ export class BrowserManager {
    * Changes viewport, user-agent, and touch emulation
    */
   async setDeviceMode(deviceId: string): Promise<boolean> {
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) return false;
 
     const preset = DEVICE_PRESETS[deviceId];
     if (!preset) {
@@ -309,10 +315,22 @@ export class BrowserManager {
     this.currentDevice = deviceId;
     const webContents = this.view.webContents;
 
+    // Temporarily detach network interceptor to avoid debugger conflicts
+    const wasNetworkAttached = this.networkInterceptor['debuggerAttached'];
+    if (wasNetworkAttached) {
+      this.networkInterceptor.detach();
+    }
+
     try {
+      // Check if debugger is already attached
+      const alreadyAttached = webContents.debugger.isAttached();
+
+      if (!alreadyAttached) {
+        await webContents.debugger.attach('1.3');
+      }
+
       // For desktop mode, disable emulation
       if (deviceId === 'desktop') {
-        await webContents.debugger.attach('1.3');
         await webContents.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
         await webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled', {
           enabled: false
@@ -320,7 +338,6 @@ export class BrowserManager {
         await webContents.debugger.sendCommand('Emulation.setUserAgentOverride', {
           userAgent: BrowserManager.CHROME_USER_AGENT
         });
-        webContents.debugger.detach();
 
         // Reset session user agent
         this.browserSession.setUserAgent(BrowserManager.CHROME_USER_AGENT);
@@ -331,60 +348,57 @@ export class BrowserManager {
           name: preset.name,
           mobile: false
         });
+      } else {
+        // For mobile/tablet modes, enable emulation
+        // Set device metrics (viewport size, scale)
+        await webContents.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+          width: preset.width,
+          height: preset.height,
+          deviceScaleFactor: preset.deviceScaleFactor,
+          mobile: preset.mobile,
+          screenWidth: preset.width,
+          screenHeight: preset.height
+        });
 
-        return true;
+        // Enable touch emulation for mobile devices
+        await webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled', {
+          enabled: preset.mobile,
+          maxTouchPoints: preset.mobile ? 5 : 0
+        });
+
+        // Set mobile user agent
+        await webContents.debugger.sendCommand('Emulation.setUserAgentOverride', {
+          userAgent: preset.userAgent,
+          platform: preset.mobile ? (preset.userAgent.includes('iPhone') || preset.userAgent.includes('iPad') ? 'iPhone' : 'Linux armv81') : 'MacIntel'
+        });
+
+        // Update session user agent for new requests
+        this.browserSession.setUserAgent(preset.userAgent);
+
+        // Notify renderer about device change
+        this.parentWindow.webContents.send('browser:device-changed', {
+          deviceId,
+          name: preset.name,
+          mobile: preset.mobile,
+          width: preset.width,
+          height: preset.height
+        });
       }
 
-      // For mobile/tablet modes, enable emulation
-      await webContents.debugger.attach('1.3');
-
-      // Set device metrics (viewport size, scale)
-      await webContents.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
-        width: preset.width,
-        height: preset.height,
-        deviceScaleFactor: preset.deviceScaleFactor,
-        mobile: preset.mobile,
-        screenWidth: preset.width,
-        screenHeight: preset.height
-      });
-
-      // Enable touch emulation for mobile devices
-      await webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled', {
-        enabled: preset.mobile,
-        maxTouchPoints: preset.mobile ? 5 : 0
-      });
-
-      // Set mobile user agent
-      await webContents.debugger.sendCommand('Emulation.setUserAgentOverride', {
-        userAgent: preset.userAgent,
-        platform: preset.mobile ? (preset.userAgent.includes('iPhone') || preset.userAgent.includes('iPad') ? 'iPhone' : 'Linux armv81') : 'MacIntel'
-      });
-
-      webContents.debugger.detach();
-
-      // Update session user agent for new requests
-      this.browserSession.setUserAgent(preset.userAgent);
-
-      // Notify renderer about device change
-      this.parentWindow.webContents.send('browser:device-changed', {
-        deviceId,
-        name: preset.name,
-        mobile: preset.mobile,
-        width: preset.width,
-        height: preset.height
-      });
-
+      // Don't detach debugger - let network interceptor reuse it
       // Reload page to apply changes
       webContents.reload();
+
+      // Re-attach network interceptor after a short delay to allow page reload
+      if (wasNetworkAttached) {
+        setTimeout(() => {
+          this.attachNetworkInterceptor();
+        }, 1000);
+      }
 
       return true;
     } catch (error) {
       console.error('setDeviceMode failed:', error);
-      try {
-        webContents.debugger.detach();
-      } catch {
-        // Ignore detach errors
-      }
       return false;
     }
   }
@@ -402,37 +416,43 @@ export class BrowserManager {
 
     return new Promise((resolve) => {
       const webContents = this.view!.webContents;
+      let timeoutId: NodeJS.Timeout | null = null;
+      let resolved = false;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        webContents.removeListener('did-finish-load', onDidFinish);
+        webContents.removeListener('did-fail-load', onDidFail);
+      };
 
       const onDidFinish = () => {
+        if (resolved) return;
+        resolved = true;
         cleanup();
         resolve(true);
       };
 
       const onDidFail = () => {
+        if (resolved) return;
+        resolved = true;
         cleanup();
         resolve(false);
       };
 
-      const cleanup = () => {
-        webContents.removeListener('did-finish-load', onDidFinish);
-        webContents.removeListener('did-fail-load', onDidFail);
-      };
-
       // Set timeout in case load takes too long
-      const timeout = setTimeout(() => {
+      timeoutId = setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
         cleanup();
         resolve(true); // Resolve anyway after timeout
       }, 15000);
 
-      webContents.once('did-finish-load', () => {
-        clearTimeout(timeout);
-        onDidFinish();
-      });
-
-      webContents.once('did-fail-load', () => {
-        clearTimeout(timeout);
-        onDidFail();
-      });
+      // Use once to ensure auto-cleanup
+      webContents.once('did-finish-load', onDidFinish);
+      webContents.once('did-fail-load', onDidFail);
 
       webContents.loadURL(url);
     });
@@ -489,7 +509,13 @@ export class BrowserManager {
    * Resizes to max 1280px and compresses to JPEG to reduce file size
    */
   async screenshot(): Promise<{ data: string; mimeType: string }> {
-    if (!this.view) return { data: '', mimeType: 'image/jpeg' };
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      return { data: '', mimeType: 'image/jpeg' };
+    }
+
+    // Store current window focus state to restore later
+    const wasFocused = this.parentWindow.isFocused();
+
     let image = await this.view.webContents.capturePage();
 
     // Resize to max 1280px to keep file size small for API requests
@@ -504,6 +530,15 @@ export class BrowserManager {
 
     // Return as JPEG (much smaller than PNG) with 80% quality
     const jpegBuffer = image.toJPEG(80);
+
+    // If window wasn't focused before, blur it to prevent stealing focus
+    if (!wasFocused && process.platform === 'darwin') {
+      // On macOS, if the window gained focus during the operation, blur it
+      if (this.parentWindow.isFocused()) {
+        this.parentWindow.blur();
+      }
+    }
+
     return {
       data: jpegBuffer.toString('base64'),
       mimeType: 'image/jpeg'
@@ -528,7 +563,12 @@ export class BrowserManager {
     mimeType: string;
     elements: AnnotatedElement[];
   }> {
-    if (!this.view) return { data: '', mimeType: 'image/jpeg', elements: [] };
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      return { data: '', mimeType: 'image/jpeg', elements: [] };
+    }
+
+    // Store current window focus state to restore later
+    const wasFocused = this.parentWindow.isFocused();
 
     // Inject badges and collect element info
     const elements = await this.view.webContents.executeJavaScript(`
@@ -651,6 +691,14 @@ export class BrowserManager {
     }
 
     const jpegBuffer = image.toJPEG(80);
+
+    // If window wasn't focused before, blur it to prevent stealing focus
+    if (!wasFocused && process.platform === 'darwin') {
+      // On macOS, if the window gained focus during the operation, blur it
+      if (this.parentWindow.isFocused()) {
+        this.parentWindow.blur();
+      }
+    }
 
     return {
       data: jpegBuffer.toString('base64'),
@@ -877,12 +925,27 @@ export class BrowserManager {
    * Execute arbitrary JavaScript
    */
   async evaluateJS(code: string): Promise<unknown> {
-    if (!this.view) return null;
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      console.error('evaluateJS failed: webContents is destroyed');
+      return null;
+    }
+
+    // Check if page is ready
+    const url = this.view.webContents.getURL();
+    if (!url || url === 'about:blank') {
+      console.error('evaluateJS failed: page not loaded yet');
+      return null;
+    }
+
     try {
       return await this.view.webContents.executeJavaScript(code);
     } catch (error) {
-      console.error('evaluateJS failed:', error);
-      return null;
+      // Log more detailed error information
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`evaluateJS failed: ${errorMessage}`);
+      console.error(`Code: ${code.substring(0, 100)}...`);
+      console.error(`URL: ${url}`);
+      throw error; // Re-throw to let caller handle it
     }
   }
 

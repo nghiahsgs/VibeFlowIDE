@@ -175,8 +175,13 @@ export class MCPBridge {
           if (!code) {
             return { id, success: false, error: 'Missing code' };
           }
-          const result = await this.browser.evaluateJS(code);
-          return { id, success: true, data: result };
+          try {
+            const result = await this.browser.evaluateJS(code);
+            return { id, success: true, data: result };
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return { id, success: false, error: `Script execution failed: ${errorMessage}` };
+          }
         }
 
         case 'getCurrentURL': {
