@@ -68,6 +68,18 @@ export class NetworkInterceptor {
       webContents.debugger.on('detach', (_, reason) => {
         console.log('Debugger detached:', reason);
         this.debuggerAttached = false;
+
+        // If detached due to crash, try to reattach after a delay
+        if (reason === 'target_closed' || reason === 'canceled_by_user') {
+          setTimeout(() => {
+            if (this.webContents && !this.webContents.isDestroyed()) {
+              console.log('Attempting to reattach network interceptor...');
+              this.attach(this.webContents).catch(err => {
+                console.error('Failed to reattach:', err);
+              });
+            }
+          }, 2000);
+        }
       });
     } catch (err) {
       console.error('Failed to attach debugger:', err);

@@ -272,6 +272,17 @@ function restoreTerminalSessions(): void {
   }
 }
 
+// Suppress macOS IMK (Input Method Kit) warnings
+// These are harmless and just clutter the console
+if (process.platform === 'darwin') {
+  process.on('warning', (warning) => {
+    if (warning.message?.includes('IMKCFRunLoopWakeUpReliable')) {
+      return; // Suppress IMK warnings
+    }
+    console.warn(warning);
+  });
+}
+
 // App lifecycle
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.vibeflow.ide');

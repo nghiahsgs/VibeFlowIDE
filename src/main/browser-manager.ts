@@ -172,6 +172,29 @@ export class BrowserManager {
       return { action: 'deny' }; // Prevent external popup
     });
 
+    // Handle renderer process crashes
+    this.view.webContents.on('render-process-gone', (_, details) => {
+      console.error('Renderer process crashed:', details);
+      if (details.reason !== 'clean-exit') {
+        // Attempt to reload the page after a crash
+        setTimeout(() => {
+          if (this.view && !this.view.webContents.isDestroyed()) {
+            console.log('Attempting to recover from crash...');
+            this.view.webContents.reload();
+          }
+        }, 1000);
+      }
+    });
+
+    // Handle unresponsive pages
+    this.view.webContents.on('unresponsive', () => {
+      console.warn('Browser became unresponsive');
+    });
+
+    this.view.webContents.on('responsive', () => {
+      console.log('Browser became responsive again');
+    });
+
     // Setup network update callback
     this.networkInterceptor.onUpdate((requests) => {
       this.parentWindow.webContents.send('network:update', requests);
