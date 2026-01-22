@@ -78,6 +78,10 @@ export class MCPBridge {
       console.log('MCP client connected');
 
       let buffer = '';
+      let isClosing = false;
+
+      // Set socket timeout to prevent hanging connections
+      socket.setTimeout(30000); // 30 seconds
 
       socket.on('data', async (data) => {
         buffer += data.toString();
@@ -91,25 +95,48 @@ export class MCPBridge {
             try {
               const command: MCPCommand = JSON.parse(line);
               const response = await this.handleCommand(command);
-              socket.write(JSON.stringify(response) + '\n');
+
+              // Check if socket is still writable before sending response
+              if (!socket.destroyed && socket.writable) {
+                socket.write(JSON.stringify(response) + '\n');
+              }
             } catch (error) {
               const errResponse: MCPResponse = {
                 id: 'unknown',
                 success: false,
                 error: `Parse error: ${error}`
               };
-              socket.write(JSON.stringify(errResponse) + '\n');
+
+              // Check if socket is still writable before sending error
+              if (!socket.destroyed && socket.writable) {
+                socket.write(JSON.stringify(errResponse) + '\n');
+              }
             }
           }
         }
       });
 
+      socket.on('timeout', () => {
+        console.warn('MCP socket timeout, closing connection');
+        socket.end();
+      });
+
       socket.on('close', () => {
-        console.log('MCP client disconnected');
+        if (!isClosing) {
+          isClosing = true;
+          console.log('MCP client disconnected');
+        }
       });
 
       socket.on('error', (err) => {
-        console.error('MCP socket error:', err);
+        // Only log non-ECONNRESET errors (ECONNRESET is normal on client disconnect)
+        if ((err as NodeJS.ErrnoException).code !== 'ECONNRESET') {
+          console.error('MCP socket error:', err);
+        }
+        if (!isClosing) {
+          isClosing = true;
+          socket.destroy();
+        }
       });
     });
 

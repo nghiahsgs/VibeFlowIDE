@@ -740,11 +740,20 @@ export class BrowserManager {
       return false;
     }
 
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      console.error('clickByIndex failed: webContents is destroyed');
+      return false;
+    }
+
+    const url = this.view.webContents.getURL();
+    if (!url || url === 'about:blank') {
+      console.error('clickByIndex failed: page not loaded yet');
+      return false;
+    }
+
     // Click using center coordinates (more reliable than selector)
     const centerX = element.rect.x + element.rect.width / 2;
     const centerY = element.rect.y + element.rect.height / 2;
-
-    if (!this.view) return false;
 
     try {
       await this.view.webContents.executeJavaScript(`
@@ -774,7 +783,16 @@ export class BrowserManager {
       return false;
     }
 
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      console.error('typeByIndex failed: webContents is destroyed');
+      return false;
+    }
+
+    const url = this.view.webContents.getURL();
+    if (!url || url === 'about:blank') {
+      console.error('typeByIndex failed: page not loaded yet');
+      return false;
+    }
 
     try {
       const result = await this.view.webContents.executeJavaScript(`
@@ -818,9 +836,20 @@ export class BrowserManager {
    * Click element by selector
    */
   async click(selector: string): Promise<boolean> {
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      console.error('Click failed: webContents is destroyed');
+      return false;
+    }
+
+    // Check if page is ready
+    const url = this.view.webContents.getURL();
+    if (!url || url === 'about:blank') {
+      console.error('Click failed: page not loaded yet');
+      return false;
+    }
+
     try {
-      await this.view.webContents.executeJavaScript(`
+      const result = await this.view.webContents.executeJavaScript(`
         (function() {
           const el = document.querySelector('${selector.replace(/'/g, "\\'")}');
           if (el) {
@@ -830,9 +859,12 @@ export class BrowserManager {
           return false;
         })()
       `);
-      return true;
+      return result === true;
     } catch (error) {
-      console.error('Click failed:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Click failed: ${errorMessage}`);
+      console.error(`Selector: ${selector}`);
+      console.error(`URL: ${url}`);
       return false;
     }
   }
@@ -891,7 +923,17 @@ export class BrowserManager {
    * Get DOM content
    */
   async getDOM(selector?: string): Promise<string> {
-    if (!this.view) return '';
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      console.error('getDOM failed: webContents is destroyed');
+      return '';
+    }
+
+    const url = this.view.webContents.getURL();
+    if (!url || url === 'about:blank') {
+      console.error('getDOM failed: page not loaded yet');
+      return '';
+    }
+
     try {
       const script = selector
         ? `document.querySelector('${selector.replace(/'/g, "\\'")}')?.outerHTML || ''`
@@ -907,7 +949,17 @@ export class BrowserManager {
    * Type text into element
    */
   async typeText(selector: string, text: string): Promise<boolean> {
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      console.error('typeText failed: webContents is destroyed');
+      return false;
+    }
+
+    const url = this.view.webContents.getURL();
+    if (!url || url === 'about:blank') {
+      console.error('typeText failed: page not loaded yet');
+      return false;
+    }
+
     try {
       // Properly escape text by passing it as a parameter
       const result = await this.view.webContents.executeJavaScript(`
