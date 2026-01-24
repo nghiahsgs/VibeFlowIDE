@@ -260,6 +260,73 @@ async function typeText(text: string): Promise<string> {
   return `Typed: ${text}`;
 }
 
+// Key code mapping for common keys
+const KEY_CODES: Record<string, number> = {
+  'delete': 51,
+  'backspace': 51,
+  'return': 36,
+  'enter': 36,
+  'tab': 48,
+  'escape': 53,
+  'up': 126,
+  'down': 125,
+  'left': 123,
+  'right': 124,
+  'space': 49,
+};
+
+// Press a key or key combination
+async function pressKey(key: string, modifiers?: string[]): Promise<string> {
+  const keyLower = key.toLowerCase();
+  const keyCode = KEY_CODES[keyLower];
+
+  let modifierStr = '';
+  if (modifiers && modifiers.length > 0) {
+    const modMap: Record<string, string> = {
+      'cmd': 'command down',
+      'command': 'command down',
+      'shift': 'shift down',
+      'alt': 'option down',
+      'option': 'option down',
+      'ctrl': 'control down',
+      'control': 'control down',
+    };
+    modifierStr = modifiers.map(m => modMap[m.toLowerCase()] || '').filter(Boolean).join(', ');
+  }
+
+  if (keyCode !== undefined) {
+    // Use key code for special keys
+    const script = modifierStr
+      ? `key code ${keyCode} using {${modifierStr}}`
+      : `key code ${keyCode}`;
+
+    execSync(`osascript -e '
+      tell application "Simulator" to activate
+      delay 0.2
+      tell application "System Events"
+        ${script}
+      end tell
+    '`, { stdio: 'pipe' });
+  } else if (key.length === 1) {
+    // Single character - use keystroke
+    const script = modifierStr
+      ? `keystroke "${key}" using {${modifierStr}}`
+      : `keystroke "${key}"`;
+
+    execSync(`osascript -e '
+      tell application "Simulator" to activate
+      delay 0.2
+      tell application "System Events"
+        ${script}
+      end tell
+    '`, { stdio: 'pipe' });
+  } else {
+    throw new Error(`Unknown key: ${key}`);
+  }
+
+  return `Pressed: ${modifiers?.length ? modifiers.join('+') + '+' : ''}${key}`;
+}
+
 // Launch app by bundle ID
 async function launchApp(bundleId: string): Promise<string> {
   // Validate bundle ID
@@ -369,6 +436,22 @@ const tools: Tool[] = [
         text: { type: 'string', description: 'Text to type' }
       },
       required: ['text']
+    }
+  },
+  {
+    name: 'simulator_press_key',
+    description: 'Press a key or key combination in iOS Simulator. Use for navigation, delete, enter, etc.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        key: { type: 'string', description: 'Key to press: delete, backspace, return, enter, tab, escape, up, down, left, right, space, or single character (a-z)' },
+        modifiers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional modifiers: cmd, shift, alt, ctrl. Example: ["cmd", "a"] for select all'
+        }
+      },
+      required: ['key']
     }
   },
   {
@@ -488,6 +571,11 @@ async function main() {
 
         case 'simulator_type_text': {
           const result = await typeText(args?.text as string);
+          return { content: [{ type: 'text', text: result }] };
+        }
+
+        case 'simulator_press_key': {
+          const result = await pressKey(args?.key as string, args?.modifiers as string[] | undefined);
           return { content: [{ type: 'text', text: result }] };
         }
 
