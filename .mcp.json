@@ -4,6 +4,11 @@
       "command": "npx",
       "args": ["tsx", "src/mcp-server/index.ts"],
       "cwd": "~/Documents/GitHub/VibeFlowIDE"
+    },
+    "vibeflow-simulator": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp-server/simulator.ts"],
+      "cwd": "~/Documents/GitHub/VibeFlowIDE"
     }
   }
 }
