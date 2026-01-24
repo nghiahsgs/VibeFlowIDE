@@ -188,32 +188,76 @@ async function shutdownDevice(): Promise<string> {
   });
 }
 
-// Tap at coordinates
+// Get Simulator window position
+function getSimulatorWindowPosition(): { x: number; y: number; w: number; h: number } | null {
+  try {
+    const result = execSync(`osascript -e '
+      tell application "Simulator" to activate
+      delay 0.2
+      tell application "System Events"
+        tell process "Simulator"
+          set frontWindow to window 1
+          set {x, y} to position of frontWindow
+          set {w, h} to size of frontWindow
+        end tell
+      end tell
+      return (x as text) & "," & (y as text) & "," & (w as text) & "," & (h as text)
+    '`, { encoding: 'utf-8' }).trim();
+
+    const [x, y, w, h] = result.split(',').map(Number);
+    return { x, y, w, h };
+  } catch {
+    return null;
+  }
+}
+
+// Tap at coordinates (relative to simulator screen)
 async function tap(x: number, y: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('xcrun', [
-      'simctl', 'io', 'booted', 'tap', x.toString(), y.toString()
-    ]);
+  const win = getSimulatorWindowPosition();
+  if (!win) {
+    throw new Error('Could not get Simulator window position');
+  }
 
-    const timeout = setTimeout(() => {
-      proc.kill();
-      reject(new Error('Tap timeout'));
-    }, 5000);
+  // Account for window title bar (~28px on macOS)
+  const TITLE_BAR_HEIGHT = 28;
+  const absX = win.x + x;
+  const absY = win.y + TITLE_BAR_HEIGHT + y;
 
-    proc.on('close', (code) => {
-      clearTimeout(timeout);
-      if (code === 0) {
-        resolve(`Tapped at (${x}, ${y})`);
-      } else {
-        reject(new Error('Tap failed'));
-      }
-    });
+  // Try cliclick first, fallback to AppleScript
+  try {
+    execSync(`cliclick c:${Math.round(absX)},${Math.round(absY)}`, { stdio: 'pipe' });
+    return `Tapped at (${x}, ${y})`;
+  } catch {
+    // Fallback to AppleScript
+    execSync(`osascript -e '
+      tell application "Simulator" to activate
+      delay 0.2
+      tell application "System Events"
+        click at {${Math.round(absX)}, ${Math.round(absY)}}
+      end tell
+    '`, { stdio: 'pipe' });
+    return `Tapped at (${x}, ${y})`;
+  }
+}
 
-    proc.on('error', (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
+// Type text into focused field using pasteboard
+async function typeText(text: string): Promise<string> {
+  // Copy text to simulator pasteboard
+  execSync(`echo -n "${text.replace(/"/g, '\\"')}" | xcrun simctl pbcopy booted`, {
+    encoding: 'utf-8',
+    shell: '/bin/bash'
   });
+
+  // Paste using Cmd+V
+  execSync(`osascript -e '
+    tell application "Simulator" to activate
+    delay 0.2
+    tell application "System Events"
+      keystroke "v" using command down
+    end tell
+  '`, { stdio: 'pipe' });
+
+  return `Typed: ${text}`;
 }
 
 // Launch app by bundle ID
@@ -306,14 +350,25 @@ const tools: Tool[] = [
   },
   {
     name: 'simulator_tap',
-    description: 'Tap at specific coordinates on the iOS Simulator screen',
+    description: 'Tap at specific coordinates on the iOS Simulator screen (relative to simulator content, not window)',
     inputSchema: {
       type: 'object',
       properties: {
-        x: { type: 'number', description: 'X coordinate (from left)' },
-        y: { type: 'number', description: 'Y coordinate (from top)' }
+        x: { type: 'number', description: 'X coordinate from left of simulator screen' },
+        y: { type: 'number', description: 'Y coordinate from top of simulator screen' }
       },
       required: ['x', 'y']
+    }
+  },
+  {
+    name: 'simulator_type_text',
+    description: 'Type text into the currently focused input field in iOS Simulator',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Text to type' }
+      },
+      required: ['text']
     }
   },
   {
@@ -428,6 +483,11 @@ async function main() {
 
         case 'simulator_tap': {
           const result = await tap(args?.x as number, args?.y as number);
+          return { content: [{ type: 'text', text: result }] };
+        }
+
+        case 'simulator_type_text': {
+          const result = await typeText(args?.text as string);
           return { content: [{ type: 'text', text: result }] };
         }
 
