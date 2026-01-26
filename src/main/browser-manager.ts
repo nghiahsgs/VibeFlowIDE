@@ -172,18 +172,35 @@ export class BrowserManager {
       return { action: 'deny' }; // Prevent external popup
     });
 
-    // Handle renderer process crashes
+    // Handle renderer process crashes with better recovery
     this.view.webContents.on('render-process-gone', (_, details) => {
-      console.error('Renderer process crashed:', details);
-      if (details.reason !== 'clean-exit') {
-        // Attempt to reload the page after a crash
-        setTimeout(() => {
-          if (this.view && !this.view.webContents.isDestroyed()) {
-            console.log('Attempting to recover from crash...');
-            this.view.webContents.reload();
-          }
-        }, 1000);
+      console.error('Renderer process gone:', details.reason, details.exitCode);
+
+      if (details.reason === 'clean-exit') {
+        return;
       }
+
+      // Clear any cached state that might be stale
+      this.annotatedElements = [];
+      this.consoleLogs = [];
+
+      // Attempt to reload the page after a crash
+      setTimeout(() => {
+        if (this.view && !this.view.webContents.isDestroyed()) {
+          console.log('Attempting to recover from crash...');
+          try {
+            // Try to get the current URL to reload it
+            const url = this.view.webContents.getURL();
+            if (url && url !== 'about:blank') {
+              this.view.webContents.loadURL(url);
+            } else {
+              this.view.webContents.loadURL('https://www.google.com');
+            }
+          } catch (error) {
+            console.error('Failed to recover from crash:', error);
+          }
+        }
+      }, 1500);
     });
 
     // Handle unresponsive pages
@@ -731,6 +748,34 @@ export class BrowserManager {
   }
 
   /**
+   * Check if page is ready for script execution
+   */
+  private async isPageReady(): Promise<boolean> {
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      return false;
+    }
+
+    const url = this.view.webContents.getURL();
+    if (!url || url === 'about:blank') {
+      return false;
+    }
+
+    // Check if page is loading
+    if (this.view.webContents.isLoading()) {
+      // Wait for page to finish loading (max 5 seconds)
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => resolve(), 5000);
+        this.view?.webContents.once('did-finish-load', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+    }
+
+    return true;
+  }
+
+  /**
    * Click element by index (from annotateScreenshot)
    */
   async clickByIndex(index: number): Promise<boolean> {
@@ -740,14 +785,8 @@ export class BrowserManager {
       return false;
     }
 
-    if (!this.view || this.view.webContents.isDestroyed()) {
-      console.error('clickByIndex failed: webContents is destroyed');
-      return false;
-    }
-
-    const url = this.view.webContents.getURL();
-    if (!url || url === 'about:blank') {
-      console.error('clickByIndex failed: page not loaded yet');
+    if (!await this.isPageReady()) {
+      console.error('clickByIndex failed: page not ready');
       return false;
     }
 
@@ -756,7 +795,7 @@ export class BrowserManager {
     const centerY = element.rect.y + element.rect.height / 2;
 
     try {
-      await this.view.webContents.executeJavaScript(`
+      await this.view!.webContents.executeJavaScript(`
         (function() {
           const el = document.elementFromPoint(${centerX}, ${centerY});
           if (el) {
@@ -783,19 +822,13 @@ export class BrowserManager {
       return false;
     }
 
-    if (!this.view || this.view.webContents.isDestroyed()) {
-      console.error('typeByIndex failed: webContents is destroyed');
-      return false;
-    }
-
-    const url = this.view.webContents.getURL();
-    if (!url || url === 'about:blank') {
-      console.error('typeByIndex failed: page not loaded yet');
+    if (!await this.isPageReady()) {
+      console.error('typeByIndex failed: page not ready');
       return false;
     }
 
     try {
-      const result = await this.view.webContents.executeJavaScript(`
+      const result = await this.view!.webContents.executeJavaScript(`
         (function(x, y, text) {
           const el = document.elementFromPoint(x, y);
           if (!el) return false;
@@ -836,32 +869,26 @@ export class BrowserManager {
    * Click element by selector
    */
   async click(selector: string): Promise<boolean> {
-    if (!this.view || this.view.webContents.isDestroyed()) {
-      console.error('Click failed: webContents is destroyed');
-      return false;
-    }
-
-    // Check if page is ready
-    const url = this.view.webContents.getURL();
-    if (!url || url === 'about:blank') {
-      console.error('Click failed: page not loaded yet');
+    if (!await this.isPageReady()) {
+      console.error('Click failed: page not ready');
       return false;
     }
 
     try {
-      const result = await this.view.webContents.executeJavaScript(`
-        (function() {
-          const el = document.querySelector('${selector.replace(/'/g, "\\'")}');
+      const result = await this.view!.webContents.executeJavaScript(`
+        (function(selector) {
+          const el = document.querySelector(selector);
           if (el) {
             el.click();
             return true;
           }
           return false;
-        })()
+        })(${JSON.stringify(selector)})
       `);
       return result === true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const url = this.view?.webContents.getURL() || 'unknown';
       console.error(`Click failed: ${errorMessage}`);
       console.error(`Selector: ${selector}`);
       console.error(`URL: ${url}`);
@@ -923,22 +950,20 @@ export class BrowserManager {
    * Get DOM content
    */
   async getDOM(selector?: string): Promise<string> {
-    if (!this.view || this.view.webContents.isDestroyed()) {
-      console.error('getDOM failed: webContents is destroyed');
-      return '';
-    }
-
-    const url = this.view.webContents.getURL();
-    if (!url || url === 'about:blank') {
-      console.error('getDOM failed: page not loaded yet');
+    if (!await this.isPageReady()) {
+      console.error('getDOM failed: page not ready');
       return '';
     }
 
     try {
-      const script = selector
-        ? `document.querySelector('${selector.replace(/'/g, "\\'")}')?.outerHTML || ''`
-        : `document.documentElement.outerHTML`;
-      return await this.view.webContents.executeJavaScript(script);
+      if (selector) {
+        return await this.view!.webContents.executeJavaScript(`
+          (function(selector) {
+            return document.querySelector(selector)?.outerHTML || '';
+          })(${JSON.stringify(selector)})
+        `);
+      }
+      return await this.view!.webContents.executeJavaScript(`document.documentElement.outerHTML`);
     } catch (error) {
       console.error('getDOM failed:', error);
       return '';
@@ -949,20 +974,13 @@ export class BrowserManager {
    * Type text into element
    */
   async typeText(selector: string, text: string): Promise<boolean> {
-    if (!this.view || this.view.webContents.isDestroyed()) {
-      console.error('typeText failed: webContents is destroyed');
-      return false;
-    }
-
-    const url = this.view.webContents.getURL();
-    if (!url || url === 'about:blank') {
-      console.error('typeText failed: page not loaded yet');
+    if (!await this.isPageReady()) {
+      console.error('typeText failed: page not ready');
       return false;
     }
 
     try {
-      // Properly escape text by passing it as a parameter
-      const result = await this.view.webContents.executeJavaScript(`
+      const result = await this.view!.webContents.executeJavaScript(`
         (function(selector, text) {
           const el = document.querySelector(selector);
           if (!el) return false;
@@ -1000,23 +1018,17 @@ export class BrowserManager {
    * Execute arbitrary JavaScript
    */
   async evaluateJS(code: string): Promise<unknown> {
-    if (!this.view || this.view.webContents.isDestroyed()) {
-      console.error('evaluateJS failed: webContents is destroyed');
-      return null;
-    }
-
-    // Check if page is ready
-    const url = this.view.webContents.getURL();
-    if (!url || url === 'about:blank') {
-      console.error('evaluateJS failed: page not loaded yet');
+    if (!await this.isPageReady()) {
+      console.error('evaluateJS failed: page not ready');
       return null;
     }
 
     try {
-      return await this.view.webContents.executeJavaScript(code);
+      return await this.view!.webContents.executeJavaScript(code);
     } catch (error) {
       // Log more detailed error information
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const url = this.view?.webContents.getURL() || 'unknown';
       console.error(`evaluateJS failed: ${errorMessage}`);
       console.error(`Code: ${code.substring(0, 100)}...`);
       console.error(`URL: ${url}`);

@@ -69,16 +69,16 @@ export class NetworkInterceptor {
         console.log('Debugger detached:', reason);
         this.debuggerAttached = false;
 
-        // If detached due to crash, try to reattach after a delay
-        if (reason === 'target_closed' || reason === 'canceled_by_user') {
+        // If detached due to crash or render process issues, try to reattach after a delay
+        if (reason === 'target_closed' || reason === 'canceled_by_user' || reason === 'render_widget_host_destroyed') {
           setTimeout(() => {
-            if (this.webContents && !this.webContents.isDestroyed()) {
+            if (this.webContents && !this.webContents.isDestroyed() && !this.webContents.isLoading()) {
               console.log('Attempting to reattach network interceptor...');
               this.attach(this.webContents).catch(err => {
                 console.error('Failed to reattach:', err);
               });
             }
-          }, 2000);
+          }, 3000); // Increased delay for better stability
         }
       });
     } catch (err) {
