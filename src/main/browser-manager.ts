@@ -157,6 +157,8 @@ export class BrowserManager {
     // Handle navigation events
     this.view.webContents.on('did-navigate', (_, url) => {
       this.parentWindow.webContents.send('browser:navigated', url);
+      // Clear annotated elements cache on navigation (stale data)
+      this.annotatedElements = [];
     });
 
     this.view.webContents.on('did-navigate-in-page', (_, url) => {

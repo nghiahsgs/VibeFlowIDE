@@ -23,6 +23,11 @@ export interface NetworkRequest {
   error?: string;
 }
 
+// Maximum number of requests to store in memory
+const MAX_REQUESTS = 200;
+// Maximum response body size to store (10KB instead of 100KB)
+const MAX_RESPONSE_BODY_SIZE = 10 * 1024;
+
 export class NetworkInterceptor {
   private requests: Map<string, NetworkRequest> = new Map();
   private webContents: WebContents | null = null;
@@ -131,7 +136,31 @@ export class NetworkInterceptor {
     };
 
     this.requests.set(requestId, networkRequest);
+
+    // Prune old requests to prevent memory leak
+    this.pruneOldRequests();
+
     this.notifyUpdate();
+  }
+
+  /**
+   * Remove old requests when exceeding MAX_REQUESTS limit
+   * Keeps only the most recent requests
+   */
+  private pruneOldRequests(): void {
+    if (this.requests.size <= MAX_REQUESTS) {
+      return;
+    }
+
+    // Get all requests sorted by start time (oldest first)
+    const sortedRequests = Array.from(this.requests.entries())
+      .sort((a, b) => a[1].startTime - b[1].startTime);
+
+    // Remove oldest requests until we're under the limit
+    const toRemove = sortedRequests.slice(0, this.requests.size - MAX_REQUESTS);
+    for (const [id] of toRemove) {
+      this.requests.delete(id);
+    }
   }
 
   private onResponseReceived(params: Record<string, unknown>): void {
@@ -170,8 +199,8 @@ export class NetworkInterceptor {
             // For binary content, just indicate it's binary
             request.responseBody = `[Binary data: ${request.mimeType}]`;
           } else {
-            // Limit response body to 100KB to avoid memory issues
-            request.responseBody = result.body.substring(0, 100 * 1024);
+            // Limit response body size to prevent memory issues
+            request.responseBody = result.body.substring(0, MAX_RESPONSE_BODY_SIZE);
           }
         } catch {
           // Some responses don't have body (304, redirects, etc.)
