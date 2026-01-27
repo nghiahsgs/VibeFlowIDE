@@ -8,6 +8,7 @@ import path from 'path';
 import os from 'os';
 import { BrowserManager } from './browser-manager';
 import { SimulatorManager } from './simulator-manager';
+import { SettingsManager } from './settings-manager';
 
 const MCP_BRIDGE_PORT = 9876;
 const MAX_PORT_ATTEMPTS = 10;
@@ -37,11 +38,13 @@ export class MCPBridge {
   private server: net.Server | null = null;
   private browser: BrowserManager;
   private simulator: SimulatorManager | null = null;
+  private settings: SettingsManager;
   private port: number = MCP_BRIDGE_PORT;
 
-  constructor(browser: BrowserManager, simulator?: SimulatorManager) {
+  constructor(browser: BrowserManager, simulator?: SimulatorManager, settings?: SettingsManager) {
     this.browser = browser;
     this.simulator = simulator || null;
+    this.settings = settings || new SettingsManager();
     this.startServer();
   }
 
@@ -448,6 +451,35 @@ export class MCPBridge {
           }
           const status = await this.simulator.getStatus();
           return { id, success: true, data: status };
+        }
+
+        // Settings commands
+        case 'settings:getContext': {
+          const context = this.settings.getContext();
+          return { id, success: true, data: context };
+        }
+
+        case 'settings:setContext': {
+          const prompt = args?.prompt as string;
+          if (!prompt) {
+            return { id, success: false, error: 'Missing prompt' };
+          }
+          this.settings.setContext(prompt);
+          return { id, success: true, data: 'Context updated' };
+        }
+
+        case 'settings:getAllContexts': {
+          const contexts = this.settings.getAllContexts();
+          return { id, success: true, data: contexts };
+        }
+
+        case 'settings:deleteContext': {
+          const cwd = args?.cwd as string;
+          if (!cwd) {
+            return { id, success: false, error: 'Missing cwd' };
+          }
+          this.settings.deleteContext(cwd);
+          return { id, success: true, data: 'Context deleted' };
         }
 
         default:

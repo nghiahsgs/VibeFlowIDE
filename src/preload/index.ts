@@ -86,14 +86,35 @@ const simulatorAPI = {
   }
 };
 
+// Settings API
+interface ProjectContext {
+  prompt: string;
+  updatedAt: number;
+}
+
+const settingsAPI = {
+  getContext: () => ipcRenderer.invoke('settings:get-context') as Promise<ProjectContext | null>,
+  setContext: (prompt: string) => ipcRenderer.invoke('settings:set-context', prompt) as Promise<boolean>,
+  getAllContexts: () => ipcRenderer.invoke('settings:get-all-contexts') as Promise<Record<string, ProjectContext>>,
+  deleteContext: (cwd: string) => ipcRenderer.invoke('settings:delete-context', cwd) as Promise<boolean>,
+  getSettings: () => ipcRenderer.invoke('settings:get-settings'),
+  onContextUpdated: (callback: (data: { cwd: string; context: ProjectContext }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: { cwd: string; context: ProjectContext }) => callback(data);
+    ipcRenderer.on('settings:context-updated', handler);
+    return () => ipcRenderer.removeListener('settings:context-updated', handler);
+  }
+};
+
 // Expose APIs to renderer
 contextBridge.exposeInMainWorld('terminal', terminalAPI);
 contextBridge.exposeInMainWorld('browser', browserAPI);
 contextBridge.exposeInMainWorld('network', networkAPI);
 contextBridge.exposeInMainWorld('ports', portsAPI);
 contextBridge.exposeInMainWorld('simulator', simulatorAPI);
+contextBridge.exposeInMainWorld('settings', settingsAPI);
 
 // Type declarations for renderer
 export type TerminalAPI = typeof terminalAPI;
 export type BrowserAPI = typeof browserAPI;
 export type SimulatorAPI = typeof simulatorAPI;
+export type SettingsAPI = typeof settingsAPI;

@@ -536,8 +536,35 @@ const simulatorTools: Tool[] = [
   }
 ];
 
+// Settings/Context tools
+const settingsTools: Tool[] = [
+  {
+    name: 'get_project_context',
+    description: 'Get project context and system instructions configured by the user. Call this at the start of a session or when you need project-specific guidelines.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'set_project_context',
+    description: 'Set or update the project context/system prompt. This will be persisted for future sessions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'The system prompt/context to set for this project'
+        }
+      },
+      required: ['prompt']
+    }
+  }
+];
+
 // Combined tools
-const tools: Tool[] = [...browserTools, ...simulatorTools];
+const tools: Tool[] = [...browserTools, ...simulatorTools, ...settingsTools];
 
 // Bridge to Electron app
 class ElectronBridge {
@@ -1037,6 +1064,42 @@ async function main() {
             content: [{
               type: 'text',
               text: JSON.stringify(status, null, 2)
+            }]
+          };
+        }
+
+        // Settings/Context tools
+        case 'get_project_context': {
+          const context = await bridge.sendCommand('settings:getContext') as { prompt: string; updatedAt: number } | null;
+          if (!context || !context.prompt) {
+            return {
+              content: [{
+                type: 'text',
+                text: 'No project context configured. Use set_project_context to add one, or configure it in VibeFlow IDE Settings tab.'
+              }]
+            };
+          }
+          return {
+            content: [{
+              type: 'text',
+              text: `--- PROJECT CONTEXT ---\n${context.prompt}\n--- END CONTEXT ---`
+            }]
+          };
+        }
+
+        case 'set_project_context': {
+          const prompt = args?.prompt as string;
+          if (!prompt) {
+            return {
+              content: [{ type: 'text', text: 'Error: Missing prompt parameter' }],
+              isError: true
+            };
+          }
+          await bridge.sendCommand('settings:setContext', { prompt });
+          return {
+            content: [{
+              type: 'text',
+              text: 'Project context updated successfully.'
             }]
           };
         }

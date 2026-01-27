@@ -1,6 +1,6 @@
 /**
  * Left Panel Component
- * Contains Terminal, Network, Console, Ports, and MCP tabs
+ * Contains Terminal, Network, Console, Ports, MCP, and Settings tabs
  * Terminal is always mounted to preserve PTY connection
  */
 import { useState } from 'react';
@@ -9,8 +9,9 @@ import { NetworkPanel } from './network-panel';
 import { ConsolePanel } from './console-panel';
 import { MCPPanel } from './mcp-panel';
 import { PortsPanel } from './ports-panel';
+import { SettingsPanel } from './settings-panel';
 
-type TabType = 'terminal' | 'network' | 'console' | 'ports' | 'mcp';
+type TabType = 'terminal' | 'network' | 'console' | 'ports' | 'mcp' | 'settings';
 
 export function LeftPanel() {
   const [activeTab, setActiveTab] = useState<TabType>('terminal');
@@ -48,6 +49,12 @@ export function LeftPanel() {
         >
           MCP
         </button>
+        <button
+          className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          Settings
+        </button>
       </div>
 
       <div className="left-panel-content">
@@ -63,6 +70,8 @@ export function LeftPanel() {
         {activeTab === 'ports' && <PortsPanel />}
         {/* MCP panel */}
         {activeTab === 'mcp' && <MCPPanel />}
+        {/* Settings panel */}
+        {activeTab === 'settings' && <SettingsPanel />}
       </div>
     </div>
   );

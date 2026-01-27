@@ -1212,3 +1212,184 @@
 .status-warning {
   color: #e5e510;
 }
+
+/* Settings Panel */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+  background: #1e1e1e;
+  overflow-y: auto;
+  font-size: 12px;
+  color: #cccccc;
+}
+
+.settings-header {
+  margin-bottom: 16px;
+}
+
+.settings-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.settings-hint {
+  color: #888888;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.settings-hint code {
+  color: #dcdcaa;
+  background: #2d2d2d;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.settings-content {
+  margin-bottom: 16px;
+}
+
+.prompt-section {
+  margin-bottom: 12px;
+}
+
+.prompt-section label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #888888;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.prompt-section textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 10px;
+  background: #2d2d2d;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  color: #cccccc;
+  font-size: 12px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.prompt-section textarea:focus {
+  outline: none;
+  border-color: #007acc;
+}
+
+.prompt-section textarea::placeholder {
+  color: #666666;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.save-btn {
+  padding: 8px 16px;
+  background: #007acc;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: #0098ff;
+}
+
+.save-btn:disabled {
+  background: #3c3c3c;
+  color: #666666;
+  cursor: not-allowed;
+}
+
+.save-btn.saved {
+  background: #23d18b;
+}
+
+.clear-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  color: #888888;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clear-btn:hover {
+  background: #3c3c3c;
+  color: #cccccc;
+}
+
+.last-updated {
+  font-size: 10px;
+  color: #666666;
+  margin: 0;
+}
+
+.settings-info {
+  padding: 12px;
+  background: #252526;
+  border-radius: 6px;
+}
+
+.settings-info h4 {
+  margin: 0 0 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888888;
+}
+
+.usage-steps {
+  margin: 0 0 12px 0;
+  padding-left: 20px;
+}
+
+.usage-steps li {
+  padding: 2px 0;
+  color: #cccccc;
+  font-size: 11px;
+}
+
+.usage-steps code {
+  color: #dcdcaa;
+  background: #2d2d2d;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.tip-box {
+  padding: 8px 10px;
+  background: rgba(0, 122, 204, 0.15);
+  border-left: 3px solid #007acc;
+  border-radius: 0 4px 4px 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.tip-box strong {
+  color: #007acc;
+}

@@ -10,6 +10,7 @@ import { BrowserManager } from './browser-manager';
 import { MCPBridge } from './mcp-bridge';
 import { PortManager } from './port-manager';
 import { SimulatorManager } from './simulator-manager';
+import { SettingsManager } from './settings-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let ptyManager: PtyManager | null = null;
@@ -17,6 +18,7 @@ let browserManager: BrowserManager | null = null;
 let mcpBridge: MCPBridge | null = null;
 let portManager: PortManager | null = null;
 let simulatorManager: SimulatorManager | null = null;
+let settingsManager: SettingsManager | null = null;
 let ipcHandlersRegistered = false;
 
 // Saved terminal sessions for restore after sleep/resume
@@ -56,7 +58,8 @@ function createWindow(): void {
   ptyManager = new PtyManager();
   browserManager = new BrowserManager(mainWindow);
   simulatorManager = new SimulatorManager(mainWindow);
-  mcpBridge = new MCPBridge(browserManager, simulatorManager);
+  settingsManager = new SettingsManager(mainWindow);
+  mcpBridge = new MCPBridge(browserManager, simulatorManager, settingsManager);
   portManager = new PortManager();
 
   // Setup IPC handlers (only once)
@@ -66,6 +69,7 @@ function createWindow(): void {
     setupNetworkIPC();
     setupPortsIPC();
     setupSimulatorIPC();
+    setupSettingsIPC();
     ipcHandlersRegistered = true;
   }
 
@@ -237,6 +241,31 @@ function setupSimulatorIPC(): void {
 
   ipcMain.on('simulator:stop-streaming', () => {
     simulatorManager?.stopStreaming();
+  });
+}
+
+// Settings IPC handlers
+function setupSettingsIPC(): void {
+  ipcMain.handle('settings:get-context', () => {
+    return settingsManager?.getContext() || null;
+  });
+
+  ipcMain.handle('settings:set-context', (_, prompt: string) => {
+    settingsManager?.setContext(prompt);
+    return true;
+  });
+
+  ipcMain.handle('settings:get-all-contexts', () => {
+    return settingsManager?.getAllContexts() || {};
+  });
+
+  ipcMain.handle('settings:delete-context', (_, cwd: string) => {
+    settingsManager?.deleteContext(cwd);
+    return true;
+  });
+
+  ipcMain.handle('settings:get-settings', () => {
+    return settingsManager?.getSettings() || { contexts: {} };
   });
 }
 
