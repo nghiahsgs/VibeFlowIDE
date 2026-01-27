@@ -83,8 +83,12 @@ export class MCPBridge {
       let buffer = '';
       let isClosing = false;
 
-      // Set socket timeout to prevent hanging connections
-      socket.setTimeout(30000); // 30 seconds
+      // Disable socket timeout - MCP connections should stay open
+      // Claude Code may be idle for long periods while user is thinking
+      socket.setTimeout(0);
+
+      // Enable keep-alive to detect dead connections
+      socket.setKeepAlive(true, 60000); // Check every 60s
 
       socket.on('data', async (data) => {
         buffer += data.toString();
@@ -120,8 +124,9 @@ export class MCPBridge {
       });
 
       socket.on('timeout', () => {
-        console.warn('MCP socket timeout, closing connection');
-        socket.end();
+        // Timeout disabled, but keep handler for safety
+        // Don't close - MCP connections should stay open
+        console.log('MCP socket idle (this is normal)');
       });
 
       socket.on('close', () => {
