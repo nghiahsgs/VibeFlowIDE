@@ -612,8 +612,11 @@ export class BrowserManager {
     // Store current window focus state to restore later
     const wasFocused = this.parentWindow.isFocused();
 
-    // Inject badges and collect element info
-    const elements = await this.view.webContents.executeJavaScript(`
+    let elements: AnnotatedElement[] = [];
+
+    try {
+      // Inject badges and collect element info
+      elements = await this.view.webContents.executeJavaScript(`
       (function() {
         // Remove any existing badges first
         document.querySelectorAll('[data-vibeflow-badge]').forEach(el => el.remove());
@@ -711,42 +714,50 @@ export class BrowserManager {
       })()
     `);
 
-    // Cache elements for later use
-    this.annotatedElements = elements;
+      // Cache elements for later use
+      this.annotatedElements = elements;
 
-    // Take screenshot with badges
-    let image = await this.view.webContents.capturePage();
+      // Take screenshot with badges
+      let image = await this.view.webContents.capturePage();
 
-    // Remove badges after screenshot
-    await this.view.webContents.executeJavaScript(`
-      document.querySelectorAll('[data-vibeflow-badge]').forEach(el => el.remove());
-    `);
-
-    // Resize for API limits
-    const MAX_SIZE = 1280;
-    const size = image.getSize();
-    if (size.width > MAX_SIZE || size.height > MAX_SIZE) {
-      const scale = Math.min(MAX_SIZE / size.width, MAX_SIZE / size.height);
-      const newWidth = Math.floor(size.width * scale);
-      const newHeight = Math.floor(size.height * scale);
-      image = image.resize({ width: newWidth, height: newHeight, quality: 'good' });
-    }
-
-    const jpegBuffer = image.toJPEG(80);
-
-    // If window wasn't focused before, blur it to prevent stealing focus
-    if (!wasFocused && process.platform === 'darwin') {
-      // On macOS, if the window gained focus during the operation, blur it
-      if (this.parentWindow.isFocused()) {
-        this.parentWindow.blur();
+      // Remove badges after screenshot (ignore errors)
+      try {
+        await this.view.webContents.executeJavaScript(`
+          document.querySelectorAll('[data-vibeflow-badge]').forEach(el => el.remove());
+        `);
+      } catch {
+        // Ignore cleanup errors
       }
-    }
 
-    return {
-      data: jpegBuffer.toString('base64'),
-      mimeType: 'image/jpeg',
-      elements
-    };
+      // Resize for API limits
+      const MAX_SIZE = 1280;
+      const size = image.getSize();
+      if (size.width > MAX_SIZE || size.height > MAX_SIZE) {
+        const scale = Math.min(MAX_SIZE / size.width, MAX_SIZE / size.height);
+        const newWidth = Math.floor(size.width * scale);
+        const newHeight = Math.floor(size.height * scale);
+        image = image.resize({ width: newWidth, height: newHeight, quality: 'good' });
+      }
+
+      const jpegBuffer = image.toJPEG(80);
+
+      // If window wasn't focused before, blur it to prevent stealing focus
+      if (!wasFocused && process.platform === 'darwin') {
+        // On macOS, if the window gained focus during the operation, blur it
+        if (this.parentWindow.isFocused()) {
+          this.parentWindow.blur();
+        }
+      }
+
+      return {
+        data: jpegBuffer.toString('base64'),
+        mimeType: 'image/jpeg',
+        elements
+      };
+    } catch (error) {
+      console.error('annotateScreenshot failed:', error);
+      return { data: '', mimeType: 'image/jpeg', elements: [] };
+    }
   }
 
   /**
@@ -902,7 +913,7 @@ export class BrowserManager {
    * Wait for element to appear (for modals, dynamic content)
    */
   async waitForSelector(selector: string, timeout: number = 5000): Promise<boolean> {
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) return false;
     try {
       const result = await this.view.webContents.executeJavaScript(`
         (function(selector, timeout) {
@@ -1018,23 +1029,30 @@ export class BrowserManager {
 
   /**
    * Execute arbitrary JavaScript
+   * Returns null on error instead of throwing to prevent app crash
    */
   async evaluateJS(code: string): Promise<unknown> {
+    // Extra safety check - verify view and webContents are valid
+    if (!this.view || this.view.webContents.isDestroyed()) {
+      console.error('evaluateJS failed: browser view destroyed');
+      return null;
+    }
+
     if (!await this.isPageReady()) {
       console.error('evaluateJS failed: page not ready');
       return null;
     }
 
     try {
-      return await this.view!.webContents.executeJavaScript(code);
+      return await this.view.webContents.executeJavaScript(code);
     } catch (error) {
-      // Log more detailed error information
+      // Log error but DON'T throw - prevents app crash
       const errorMessage = error instanceof Error ? error.message : String(error);
       const url = this.view?.webContents.getURL() || 'unknown';
       console.error(`evaluateJS failed: ${errorMessage}`);
       console.error(`Code: ${code.substring(0, 100)}...`);
       console.error(`URL: ${url}`);
-      throw error; // Re-throw to let caller handle it
+      return null; // Return null instead of throwing
     }
   }
 
@@ -1042,7 +1060,7 @@ export class BrowserManager {
    * Get console logs from injected history
    */
   async getConsoleLogs(): Promise<string[]> {
-    if (!this.view) return [];
+    if (!this.view || this.view.webContents.isDestroyed()) return [];
 
     try {
       // Try to get from injected console history first
@@ -1067,7 +1085,7 @@ export class BrowserManager {
     this.consoleLogs = [];
 
     // Also clear injected console history
-    if (this.view) {
+    if (this.view && !this.view.webContents.isDestroyed()) {
       try {
         await this.view.webContents.executeJavaScript('window.__consoleHistory = [];');
       } catch (error) {
@@ -1094,7 +1112,7 @@ export class BrowserManager {
    * Hover over element by selector
    */
   async hover(selector: string): Promise<boolean> {
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) return false;
     try {
       const result = await this.view.webContents.executeJavaScript(`
         (function(selector) {
@@ -1135,7 +1153,7 @@ export class BrowserManager {
     direction?: 'up' | 'down' | 'left' | 'right';
     amount?: number;
   }): Promise<boolean> {
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) return false;
     try {
       const result = await this.view.webContents.executeJavaScript(`
         (function(options) {
@@ -1199,7 +1217,7 @@ export class BrowserManager {
     label?: string;
     index?: number;
   }): Promise<boolean> {
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) return false;
     try {
       const result = await this.view.webContents.executeJavaScript(`
         (function(selector, options) {
@@ -1235,7 +1253,7 @@ export class BrowserManager {
    * Press keyboard key
    */
   async pressKey(key: string, selector?: string): Promise<boolean> {
-    if (!this.view) return false;
+    if (!this.view || this.view.webContents.isDestroyed()) return false;
     try {
       const result = await this.view.webContents.executeJavaScript(`
         (function(key, selector) {

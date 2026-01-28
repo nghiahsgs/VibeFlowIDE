@@ -210,13 +210,12 @@ export class MCPBridge {
           if (!code) {
             return { id, success: false, error: 'Missing code' };
           }
-          try {
-            const result = await this.browser.evaluateJS(code);
-            return { id, success: true, data: result };
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            return { id, success: false, error: `Script execution failed: ${errorMessage}` };
+          const result = await this.browser.evaluateJS(code);
+          // evaluateJS now returns null on error instead of throwing
+          if (result === null) {
+            return { id, success: false, error: 'Script execution failed - check browser console for details' };
           }
+          return { id, success: true, data: result };
         }
 
         case 'getCurrentURL': {
