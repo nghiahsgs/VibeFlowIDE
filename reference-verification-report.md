@@ -33,7 +33,7 @@
 |---|-----|------------------|--------------------------|-----------------|------|--------|
 | 9 | 2.3/Fig2 | "40-60% over-application" của phân bón | ❌ Không tìm thấy nguồn. Nguồn có nói "40-60% of world's food production" (khác nghĩa) | - | - | ⚠️ CẦN SỬA |
 | 10 | 2.3/Fig2 | "reduce usage by 30-40%" (fertilizer) | "precision use of agrochemicals has decreased chemical usage by 30-40%" | Sử dụng chính xác hóa chất nông nghiệp giảm 30-40% | [ResearchGate](https://www.researchgate.net/publication/389099912) | ✅ |
-| 11 | 2.3/Fig2 | "reduce water usage by 30-50%" | "precision irrigation technologies reduce water usage by 30–50% while maintaining crop productivity" (MENA research) | Công nghệ tưới chính xác giảm 30-50% nước | [MDPI](https://www.mdpi.com/2077-0472/15/5/554) | ⚠️ CẦN VERIFY |
+| 11 | 2.3/Fig2 | "reduce water usage by 30-50%" | "precision irrigation technologies reduce water usage by 30–50% while maintaining crop productivity" - Daraz et al. (2025) | Công nghệ tưới chính xác giảm 30-50% nước | [MDPI Agriculture](https://www.mdpi.com/2077-0472/15/5/554) | ✅ |
 
 ---
 
