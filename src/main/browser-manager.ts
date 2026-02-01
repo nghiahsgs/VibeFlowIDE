@@ -794,7 +794,7 @@ export class BrowserManager {
   async clickByIndex(index: number): Promise<boolean> {
     const element = this.annotatedElements.find(el => el.index === index);
     if (!element) {
-      console.error(`Element index ${index} not found in cache`);
+      console.error(`Element index ${index} not found in cache. Call browser_annotate first.`);
       return false;
     }
 
@@ -807,20 +807,38 @@ export class BrowserManager {
     const centerX = element.rect.x + element.rect.width / 2;
     const centerY = element.rect.y + element.rect.height / 2;
 
+    // Validate coordinates
+    if (!Number.isFinite(centerX) || !Number.isFinite(centerY)) {
+      console.error(`clickByIndex failed: invalid coordinates (${centerX}, ${centerY})`);
+      return false;
+    }
+
     try {
-      await this.view!.webContents.executeJavaScript(`
+      const result = await this.view!.webContents.executeJavaScript(`
         (function() {
-          const el = document.elementFromPoint(${centerX}, ${centerY});
-          if (el) {
-            el.click();
-            return true;
+          try {
+            const el = document.elementFromPoint(${centerX}, ${centerY});
+            if (el) {
+              el.click();
+              return true;
+            }
+            return false;
+          } catch (e) {
+            console.error('Click script error:', e);
+            return false;
           }
-          return false;
         })()
       `);
-      return true;
+
+      if (!result) {
+        console.error(`clickByIndex failed: no element found at (${centerX}, ${centerY})`);
+      }
+      return result === true;
     } catch (error) {
       console.error('clickByIndex failed:', error);
+      console.error(`  Element [${index}]: ${element.tag} "${element.text}"`);
+      console.error(`  Coordinates: (${centerX}, ${centerY})`);
+      console.error(`  Selector: ${element.selector}`);
       return false;
     }
   }
@@ -831,7 +849,7 @@ export class BrowserManager {
   async typeByIndex(index: number, text: string): Promise<boolean> {
     const element = this.annotatedElements.find(el => el.index === index);
     if (!element) {
-      console.error(`Element index ${index} not found in cache`);
+      console.error(`Element index ${index} not found in cache. Call browser_annotate first.`);
       return false;
     }
 
@@ -840,33 +858,54 @@ export class BrowserManager {
       return false;
     }
 
+    const centerX = element.rect.x + element.rect.width / 2;
+    const centerY = element.rect.y + element.rect.height / 2;
+
+    // Validate coordinates
+    if (!Number.isFinite(centerX) || !Number.isFinite(centerY)) {
+      console.error(`typeByIndex failed: invalid coordinates (${centerX}, ${centerY})`);
+      return false;
+    }
+
     try {
       const result = await this.view!.webContents.executeJavaScript(`
         (function(x, y, text) {
-          const el = document.elementFromPoint(x, y);
-          if (!el) return false;
+          try {
+            const el = document.elementFromPoint(x, y);
+            if (!el) return false;
 
-          el.focus();
+            el.focus();
 
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLInputElement.prototype,
-            'value'
-          )?.set;
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+              window.HTMLInputElement.prototype,
+              'value'
+            )?.set;
 
-          if (nativeInputValueSetter) {
-            nativeInputValueSetter.call(el, text);
-          } else {
-            el.value = text;
+            if (nativeInputValueSetter) {
+              nativeInputValueSetter.call(el, text);
+            } else {
+              el.value = text;
+            }
+
+            el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+            return true;
+          } catch (e) {
+            console.error('Type script error:', e);
+            return false;
           }
-
-          el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-          return true;
-        })(${element.rect.x + element.rect.width / 2}, ${element.rect.y + element.rect.height / 2}, ${JSON.stringify(text)})
+        })(${centerX}, ${centerY}, ${JSON.stringify(text)})
       `);
+
+      if (!result) {
+        console.error(`typeByIndex failed: no element found at (${centerX}, ${centerY})`);
+      }
       return result === true;
     } catch (error) {
       console.error('typeByIndex failed:', error);
+      console.error(`  Element [${index}]: ${element.tag} "${element.text}"`);
+      console.error(`  Coordinates: (${centerX}, ${centerY})`);
+      console.error(`  Selector: ${element.selector}`);
       return false;
     }
   }
