@@ -1184,6 +1184,7 @@ export class BrowserManager {
 
   /**
    * Scroll page or to element
+   * Smart scroll detection: tries window first, then finds scrollable containers
    */
   async scroll(options: {
     selector?: string;
@@ -1193,57 +1194,115 @@ export class BrowserManager {
     amount?: number;
   }): Promise<boolean> {
     if (!this.view || this.view.webContents.isDestroyed()) return false;
+
+    // Check page readiness
+    if (!await this.isPageReady()) {
+      console.error('scroll failed: page not ready');
+      return false;
+    }
+
     try {
       const result = await this.view.webContents.executeJavaScript(`
         (function(options) {
-          const { selector, x, y, direction, amount = 300 } = options;
+          try {
+            const { selector, x, y, direction, amount = 300 } = options;
 
-          // Scroll to element
-          if (selector) {
-            const el = document.querySelector(selector);
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Find scrollable container (window or first scrollable element)
+            function findScrollableContainer() {
+              // Check if window is scrollable
+              if (document.documentElement.scrollHeight > window.innerHeight) {
+                return window;
+              }
+
+              // Find first scrollable element with overflow
+              const scrollables = Array.from(document.querySelectorAll('*')).filter(el => {
+                const style = window.getComputedStyle(el);
+                const overflowY = style.overflowY;
+                return (overflowY === 'auto' || overflowY === 'scroll') &&
+                       el.scrollHeight > el.clientHeight;
+              });
+
+              // Return largest scrollable element (usually main content)
+              return scrollables.sort((a, b) =>
+                (b.scrollHeight * b.clientWidth) - (a.scrollHeight * a.clientWidth)
+              )[0] || window;
+            }
+
+            // Scroll to element
+            if (selector) {
+              const el = document.querySelector(selector);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return true;
+              }
+              console.error('Scroll failed: element not found:', selector);
+              return false;
+            }
+
+            const container = findScrollableContainer();
+            const isWindow = container === window;
+
+            // Scroll to coordinates
+            if (x !== undefined || y !== undefined) {
+              if (isWindow) {
+                window.scrollTo({
+                  left: x ?? window.scrollX,
+                  top: y ?? window.scrollY,
+                  behavior: 'smooth'
+                });
+              } else {
+                container.scrollTo({
+                  left: x ?? container.scrollLeft,
+                  top: y ?? container.scrollTop,
+                  behavior: 'smooth'
+                });
+              }
               return true;
             }
+
+            // Scroll by direction
+            if (direction) {
+              let scrollDelta = { top: 0, left: 0 };
+
+              switch (direction) {
+                case 'up':
+                  scrollDelta.top = -amount;
+                  break;
+                case 'down':
+                  scrollDelta.top = amount;
+                  break;
+                case 'left':
+                  scrollDelta.left = -amount;
+                  break;
+                case 'right':
+                  scrollDelta.left = amount;
+                  break;
+              }
+
+              if (isWindow) {
+                window.scrollBy({ ...scrollDelta, behavior: 'smooth' });
+              } else {
+                container.scrollBy({ ...scrollDelta, behavior: 'smooth' });
+              }
+              return true;
+            }
+
+            console.error('Scroll failed: no valid scroll option provided');
+            return false;
+          } catch (e) {
+            console.error('Scroll script error:', e);
             return false;
           }
-
-          // Scroll to coordinates
-          if (x !== undefined || y !== undefined) {
-            window.scrollTo({
-              left: x ?? window.scrollX,
-              top: y ?? window.scrollY,
-              behavior: 'smooth'
-            });
-            return true;
-          }
-
-          // Scroll by direction
-          if (direction) {
-            const scrollOptions = { behavior: 'smooth' };
-            switch (direction) {
-              case 'up':
-                window.scrollBy({ ...scrollOptions, top: -amount });
-                break;
-              case 'down':
-                window.scrollBy({ ...scrollOptions, top: amount });
-                break;
-              case 'left':
-                window.scrollBy({ ...scrollOptions, left: -amount });
-                break;
-              case 'right':
-                window.scrollBy({ ...scrollOptions, left: amount });
-                break;
-            }
-            return true;
-          }
-
-          return false;
         })(${JSON.stringify(options)})
       `);
+
+      if (!result) {
+        console.error('scroll failed with options:', JSON.stringify(options));
+      }
       return result === true;
     } catch (error) {
       console.error('scroll failed:', error);
+      console.error('  Options:', JSON.stringify(options));
       return false;
     }
   }
