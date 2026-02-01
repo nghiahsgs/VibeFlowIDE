@@ -1207,25 +1207,44 @@ export class BrowserManager {
           try {
             const { selector, x, y, direction, amount = 300 } = options;
 
-            // Find scrollable container (window or first scrollable element)
+            // Find scrollable container (prefer main, body, or largest container)
             function findScrollableContainer() {
-              // Check if window is scrollable
+              // Priority 1: Check common main content selectors
+              const mainSelectors = ['main', '[role="main"]', '.main-content', '#main', 'body'];
+              for (const sel of mainSelectors) {
+                const el = document.querySelector(sel);
+                if (el) {
+                  const style = window.getComputedStyle(el);
+                  const overflowY = style.overflowY;
+                  if ((overflowY === 'auto' || overflowY === 'scroll') &&
+                      el.scrollHeight > el.clientHeight) {
+                    return el;
+                  }
+                }
+              }
+
+              // Priority 2: Check if window/document is scrollable
               if (document.documentElement.scrollHeight > window.innerHeight) {
                 return window;
               }
 
-              // Find first scrollable element with overflow
+              // Priority 3: Find largest scrollable element
               const scrollables = Array.from(document.querySelectorAll('*')).filter(el => {
                 const style = window.getComputedStyle(el);
                 const overflowY = style.overflowY;
                 return (overflowY === 'auto' || overflowY === 'scroll') &&
-                       el.scrollHeight > el.clientHeight;
+                       el.scrollHeight > el.clientHeight &&
+                       el.clientHeight > 100; // Ignore small containers
               });
 
-              // Return largest scrollable element (usually main content)
-              return scrollables.sort((a, b) =>
-                (b.scrollHeight * b.clientWidth) - (a.scrollHeight * a.clientWidth)
-              )[0] || window;
+              // Return largest by scroll area (height * scrollable range)
+              const sorted = scrollables.sort((a, b) => {
+                const scoreA = a.clientHeight * (a.scrollHeight - a.clientHeight);
+                const scoreB = b.clientHeight * (b.scrollHeight - b.clientHeight);
+                return scoreB - scoreA;
+              });
+
+              return sorted[0] || window;
             }
 
             // Scroll to element
@@ -1241,6 +1260,14 @@ export class BrowserManager {
 
             const container = findScrollableContainer();
             const isWindow = container === window;
+
+            // Debug info
+            if (!isWindow) {
+              console.log('Scroll container:', container.tagName,
+                         'scrollTop:', container.scrollTop,
+                         'scrollHeight:', container.scrollHeight,
+                         'clientHeight:', container.clientHeight);
+            }
 
             // Scroll to coordinates
             if (x !== undefined || y !== undefined) {
@@ -1262,27 +1289,34 @@ export class BrowserManager {
 
             // Scroll by direction
             if (direction) {
-              let scrollDelta = { top: 0, left: 0 };
+              let scrollTop = 0, scrollLeft = 0;
 
               switch (direction) {
                 case 'up':
-                  scrollDelta.top = -amount;
+                  scrollTop = -amount;
                   break;
                 case 'down':
-                  scrollDelta.top = amount;
+                  scrollTop = amount;
                   break;
                 case 'left':
-                  scrollDelta.left = -amount;
+                  scrollLeft = -amount;
                   break;
                 case 'right':
-                  scrollDelta.left = amount;
+                  scrollLeft = amount;
                   break;
               }
 
               if (isWindow) {
-                window.scrollBy({ ...scrollDelta, behavior: 'smooth' });
+                window.scrollBy({ top: scrollTop, left: scrollLeft, behavior: 'smooth' });
               } else {
-                container.scrollBy({ ...scrollDelta, behavior: 'smooth' });
+                // Use scrollBy if available, otherwise fallback to scrollTop/scrollLeft
+                if (typeof container.scrollBy === 'function') {
+                  container.scrollBy({ top: scrollTop, left: scrollLeft, behavior: 'smooth' });
+                } else {
+                  // Fallback for older browsers or elements without scrollBy
+                  container.scrollTop += scrollTop;
+                  container.scrollLeft += scrollLeft;
+                }
               }
               return true;
             }
