@@ -43,6 +43,9 @@ export function BrowserPanel() {
     // Listen for device mode changes
     const unsubscribeDevice = window.browser.onDeviceChanged((info) => {
       setDeviceMode(info.deviceId);
+      // Force bounds update after device mode change
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(updateBounds, 100);
     });
 
     // Load device presets and current mode
