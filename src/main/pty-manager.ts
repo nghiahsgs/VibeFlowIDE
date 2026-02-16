@@ -10,7 +10,14 @@ interface PtyInstance {
   process: pty.IPty;
   onDataCallback: (data: string) => void;
   initialCwd: string;
+  createdAt: number;
+  restartCount: number;
 }
+
+const MAX_RESTART_ATTEMPTS = 3;
+const RESTART_DELAY_MS = 1500;
+// If terminal exits within this window after creation, consider it a crash
+const CRASH_WINDOW_MS = 5000;
 
 export class PtyManager {
   private instances: Map<string, PtyInstance> = new Map();
@@ -47,7 +54,7 @@ export class PtyManager {
   /**
    * Create a new terminal instance
    */
-  create(id: string, onData: (data: string) => void, cwd?: string): void {
+  create(id: string, onData: (data: string) => void, cwd?: string, restartCount = 0): void {
     // Kill existing instance if any
     this.kill(id);
 
@@ -56,38 +63,57 @@ export class PtyManager {
     const homeDir = os.homedir();
     const workingDir = cwd || homeDir;
 
-    console.log(`[PTY] Creating terminal ${id}`);
+    console.log(`[PTY] Creating terminal ${id}${restartCount > 0 ? ` (restart #${restartCount})` : ''}`);
     console.log(`[PTY] Shell: ${shell}`);
     console.log(`[PTY] CWD: ${workingDir}`);
 
     try {
+      // Inherit full process env to ensure shell has all necessary variables
+      const env: Record<string, string> = {};
+      for (const [key, value] of Object.entries(process.env)) {
+        if (value !== undefined) {
+          env[key] = value;
+        }
+      }
+      // Override specific terminal-related vars
+      env.TERM = 'xterm-256color';
+      env.COLORTERM = 'truecolor';
+      env.LANG = env.LANG || 'en_US.UTF-8';
+      env.HOME = homeDir;
+      env.SHELL = shell;
+
       const ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols: 80,
         rows: 30,
         cwd: workingDir,
-        env: {
-          PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
-          HOME: homeDir,
-          SHELL: shell,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor',
-          LANG: 'en_US.UTF-8',
-          USER: process.env.USER || os.userInfo().username
-        }
+        env
       });
 
       ptyProcess.onData(onData);
 
       ptyProcess.onExit(({ exitCode }) => {
         console.log(`[PTY] Terminal ${id} exited with code ${exitCode}`);
+        const instance = this.instances.get(id);
+        const wasQuickExit = instance && (Date.now() - instance.createdAt) < CRASH_WINDOW_MS;
         this.instances.delete(id);
+
+        // Auto-restart if terminal exited too quickly (likely a crash/resume issue)
+        if (wasQuickExit && instance && instance.restartCount < MAX_RESTART_ATTEMPTS) {
+          const nextAttempt = instance.restartCount + 1;
+          console.log(`[PTY] Terminal ${id} exited too quickly, restarting in ${RESTART_DELAY_MS}ms (attempt ${nextAttempt}/${MAX_RESTART_ATTEMPTS})`);
+          setTimeout(() => {
+            this.create(id, instance.onDataCallback, instance.initialCwd, nextAttempt);
+          }, RESTART_DELAY_MS);
+        }
       });
 
       this.instances.set(id, {
         process: ptyProcess,
         onDataCallback: onData,
-        initialCwd: workingDir
+        initialCwd: workingDir,
+        createdAt: Date.now(),
+        restartCount
       });
 
       console.log(`[PTY] Terminal ${id} created successfully`);
@@ -96,6 +122,15 @@ export class PtyManager {
       // Send error message to terminal UI
       onData(`\r\n\x1b[31mError: Failed to spawn shell (${shell})\x1b[0m\r\n`);
       onData(`\x1b[33m${error}\x1b[0m\r\n`);
+
+      // Retry on spawn failure if under limit
+      if (restartCount < MAX_RESTART_ATTEMPTS) {
+        const nextAttempt = restartCount + 1;
+        console.log(`[PTY] Retrying terminal ${id} in ${RESTART_DELAY_MS}ms (attempt ${nextAttempt}/${MAX_RESTART_ATTEMPTS})`);
+        setTimeout(() => {
+          this.create(id, onData, workingDir, nextAttempt);
+        }, RESTART_DELAY_MS);
+      }
     }
   }
 

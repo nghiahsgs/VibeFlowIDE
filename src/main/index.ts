@@ -331,10 +331,10 @@ app.whenReady().then(() => {
 
   powerMonitor.on('resume', () => {
     console.log('[Power] System resumed, checking terminals...');
-    // Delay restore to let system fully wake up
+    // Delay restore to let system fully wake up (2s for network/pty stability)
     setTimeout(() => {
       restoreTerminalSessions();
-    }, 1000);
+    }, 2000);
   });
 
   app.on('activate', () => {
