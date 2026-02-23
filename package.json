@@ -29,6 +29,7 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@electron/rebuild": "^3.6.0",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.0",
@@ -45,9 +46,15 @@
     "appId": "com.vibeflow.ide",
     "productName": "VibeFlow IDE",
     "icon": "resources/icon.icns",
+    "afterSign": "scripts/notarize.js",
     "mac": {
       "icon": "resources/icon.icns",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build-config/entitlements.mac.plist",
+      "entitlementsInherit": "build-config/entitlements.mac.plist",
+      "identity": "Developer ID Application: AGRIBEACON AGRICULTURAL TECHNOLOGY AND SOLUTIONS JOINT STOCK COMPANY (6A3UDSGHD3)"
     },
     "win": {
       "icon": "resources/icon.ico"
