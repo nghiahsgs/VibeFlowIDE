@@ -14,6 +14,11 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* Theme Indicator */}
+      <span className="theme-indicator" title="Current theme">
+        Dark
+      </span>
+
       {/* Toggle Button for Simulator */}
       <button
         className={`simulator-toggle ${showSimulator ? 'active' : ''}`}

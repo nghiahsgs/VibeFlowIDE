@@ -131,11 +131,12 @@
   width: 100% !important;
 }
 
-/* Terminal Tabs */
+/* Terminal Tabs - always pinned at bottom */
 .terminal-tabs {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
   padding: 4px 8px;
   background: #252526;
   border-top: 1px solid #3c3c3c;
@@ -168,8 +169,9 @@
 }
 
 .terminal-tab.active {
-  background: #3c3c3c;
+  background: #007acc;
   color: #ffffff;
+  border-color: #007acc;
 }
 
 .terminal-tab-icon {
@@ -988,6 +990,19 @@
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
   word-break: break-all;
   white-space: pre-wrap;
+}
+
+/* Theme Indicator */
+.theme-indicator {
+  position: fixed;
+  top: 45px;
+  right: 52px;
+  z-index: 100;
+  font-size: 11px;
+  color: #888888;
+  letter-spacing: 0.5px;
+  user-select: none;
+  line-height: 24px;
 }
 
 /* Simulator Toggle Button */

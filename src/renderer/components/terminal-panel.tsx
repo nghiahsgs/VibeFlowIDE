@@ -5,6 +5,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalInstance {
@@ -61,6 +62,12 @@ export function TerminalPanel() {
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
+
+    // Clickable links → open in browser panel
+    const webLinksAddon = new WebLinksAddon((_event, uri) => {
+      window.browser.navigate(uri);
+    });
+    terminal.loadAddon(webLinksAddon);
 
     const instance: TerminalInstance = { id, name, terminal, fitAddon, cwd };
 
